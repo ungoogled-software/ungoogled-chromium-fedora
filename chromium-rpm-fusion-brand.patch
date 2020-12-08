@@ -1,0 +1,16 @@
+From bfff7b95bb4d9ff20a3a67191dfffe25334f9dca Mon Sep 17 00:00:00 2001
+From: Akarshan Biswas <akarshan.biswas@gmail.com>
+Date: Wed, 7 Nov 2018 16:29:01 +0530
+Subject: [PATCH] Let's brand chromium-vaapi
+
+--- a/components/version_ui_strings.grdp
++++ b/components/version_ui_strings.grdp
+@@ -7,7 +7,7 @@
+     Official Build
+   </message>
+   <message name="IDS_VERSION_UI_UNOFFICIAL" desc="unofficial build on the about:version page">
+-    Developer Build
++    RPM Fusion Build
+   </message>
+   <message name="IDS_VERSION_UI_32BIT" desc="32-bit on the chrome://version page">
+     (32-bit)

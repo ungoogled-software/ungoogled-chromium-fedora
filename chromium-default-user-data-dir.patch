@@ -1,0 +1,14 @@
+Change default user data dir to ~/.config/ungoogled-chromium.
+https://github.com/Eloston/ungoogled-chromium/issues/568#issuecomment-433724920
+
+--- a/chrome/common/chrome_paths_linux.cc
++++ b/chrome/common/chrome_paths_linux.cc
+@@ -91,7 +91,7 @@ bool GetDefaultUserDataDirectory(base::F
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+   std::string data_dir_basename = "google-chrome";
+ #else
+-  std::string data_dir_basename = "chromium";
++  std::string data_dir_basename = "ungoogled-chromium";
+ #endif
+   *result = config_dir.Append(data_dir_basename + GetChannelSuffixForDataDir());
+   return true;

@@ -1,0 +1,31 @@
+--- a/third_party/catapult/common/py_vulcanize/py_vulcanize/generate.py
++++ b/third_party/catapult/common/py_vulcanize/py_vulcanize/generate.py
+@@ -83,7 +83,7 @@ def _MinifyJS(input_js):
+ 
+   with tempfile.NamedTemporaryFile() as _:
+     args = [
+-        'python',
++        'python2',
+         rjsmin_path
+     ]
+     p = subprocess.Popen(args,
+@@ -203,7 +203,7 @@ def _MinifyCSS(css_text):
+       os.path.join(py_vulcanize_path, 'third_party', 'rcssmin', 'rcssmin.py'))
+ 
+   with tempfile.NamedTemporaryFile() as _:
+-    rcssmin_args = ['python', rcssmin_path]
++    rcssmin_args = ['python2', rcssmin_path]
+     p = subprocess.Popen(rcssmin_args,
+                          stdin=subprocess.PIPE,
+                          stdout=subprocess.PIPE,
+--- a/tools/gn/bootstrap/bootstrap.py
++++ b/tools/gn/bootstrap/bootstrap.py
+@@ -129,7 +129,7 @@ def main(argv):
+     if not options.debug:
+       gn_gen_args += ' is_debug=false'
+     subprocess.check_call([
+-        gn_path, 'gen', out_dir,
++        gn_path, 'gen', out_dir, ' --script-executable=/usr/bin/python2',
+         '--args=%s' % gn_gen_args, "--root=" + SRC_ROOT
+     ])
+ 
