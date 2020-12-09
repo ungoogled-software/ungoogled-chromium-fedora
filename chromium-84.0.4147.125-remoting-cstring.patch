@@ -1,0 +1,56 @@
+diff -up chromium-84.0.4147.125/remoting/base/util.cc.remoting-cstring chromium-84.0.4147.125/remoting/base/util.cc
+--- chromium-84.0.4147.125/remoting/base/util.cc.remoting-cstring	2020-08-11 22:03:35.508469920 -0400
++++ chromium-84.0.4147.125/remoting/base/util.cc	2020-08-11 22:03:35.507469920 -0400
+@@ -4,6 +4,7 @@
+ 
+ #include "remoting/base/util.h"
+ 
++#include <cstring>
+ #include <math.h>
+ 
+ #include "base/logging.h"
+diff -up chromium-84.0.4147.125/remoting/client/display/gl_helpers.cc.remoting-cstring chromium-84.0.4147.125/remoting/client/display/gl_helpers.cc
+--- chromium-84.0.4147.125/remoting/client/display/gl_helpers.cc.remoting-cstring	2020-08-11 22:03:35.279469970 -0400
++++ chromium-84.0.4147.125/remoting/client/display/gl_helpers.cc	2020-08-11 22:03:35.277469971 -0400
+@@ -5,6 +5,7 @@
+ #include "remoting/client/display/gl_helpers.h"
+ 
+ #include "base/logging.h"
++#include <cstring>
+ 
+ namespace remoting {
+ 
+diff -up chromium-84.0.4147.125/remoting/host/fake_mouse_cursor_monitor.cc.remoting-cstring chromium-84.0.4147.125/remoting/host/fake_mouse_cursor_monitor.cc
+--- chromium-84.0.4147.125/remoting/host/fake_mouse_cursor_monitor.cc.remoting-cstring	2020-08-12 09:53:46.104504128 -0400
++++ chromium-84.0.4147.125/remoting/host/fake_mouse_cursor_monitor.cc	2020-08-12 09:53:59.123476291 -0400
+@@ -4,6 +4,7 @@
+ 
+ #include "remoting/host/fake_mouse_cursor_monitor.h"
+ 
++#include <cstring>
+ #include <memory>
+ 
+ #include "base/check.h"
+diff -up chromium-84.0.4147.125/remoting/host/host_config_unittest.cc.remoting-cstring chromium-84.0.4147.125/remoting/host/host_config_unittest.cc
+--- chromium-84.0.4147.125/remoting/host/host_config_unittest.cc.remoting-cstring	2020-08-11 22:03:35.083470013 -0400
++++ chromium-84.0.4147.125/remoting/host/host_config_unittest.cc	2020-08-11 22:03:35.196469988 -0400
+@@ -10,6 +10,7 @@
+ #include "base/memory/ref_counted.h"
+ #include "base/values.h"
+ #include "testing/gtest/include/gtest/gtest.h"
++#include <cstring>
+ 
+ namespace remoting {
+ 
+diff -up chromium-84.0.4147.125/remoting/host/host_secret.cc.remoting-cstring chromium-84.0.4147.125/remoting/host/host_secret.cc
+--- chromium-84.0.4147.125/remoting/host/host_secret.cc.remoting-cstring	2020-08-11 22:03:35.079470014 -0400
++++ chromium-84.0.4147.125/remoting/host/host_secret.cc	2020-08-11 22:03:35.029470025 -0400
+@@ -6,7 +6,7 @@
+ 
+ #include <stdint.h>
+ 
+-#include <string>
++#include <cstring>
+ 
+ #include "base/rand_util.h"
+ #include "base/strings/string_number_conversions.h"

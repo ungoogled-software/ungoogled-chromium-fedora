@@ -1,0 +1,24 @@
+diff -up chromium-78.0.3904.70/third_party/tcmalloc/chromium/src/base/linux_syscall_support.h.gcc9 chromium-78.0.3904.70/third_party/tcmalloc/chromium/src/base/linux_syscall_support.h
+--- chromium-78.0.3904.70/third_party/tcmalloc/chromium/src/base/linux_syscall_support.h.gcc9	2019-10-23 08:58:16.153251961 -0400
++++ chromium-78.0.3904.70/third_party/tcmalloc/chromium/src/base/linux_syscall_support.h	2019-10-23 08:58:36.896862347 -0400
+@@ -1486,7 +1486,7 @@ struct kernel_stat {
+                                "d"(LSS_SYSCALL_ARG(parent_tidptr)),
+                                "r"(LSS_SYSCALL_ARG(newtls)),
+                                "r"(LSS_SYSCALL_ARG(child_tidptr))
+-                             : "rsp", "memory", "r8", "r10", "r11", "rcx");
++                             : "memory", "r8", "r10", "r11", "rcx");
+       }
+       LSS_RETURN(int, __res);
+     }
+diff -up chromium-78.0.3904.70/third_party/tcmalloc/vendor/src/base/linux_syscall_support.h.gcc9 chromium-78.0.3904.70/third_party/tcmalloc/vendor/src/base/linux_syscall_support.h
+--- chromium-78.0.3904.70/third_party/tcmalloc/vendor/src/base/linux_syscall_support.h.gcc9	2019-10-23 08:58:59.623435488 -0400
++++ chromium-78.0.3904.70/third_party/tcmalloc/vendor/src/base/linux_syscall_support.h	2019-10-23 08:59:16.113125772 -0400
+@@ -1485,7 +1485,7 @@ struct kernel_stat {
+                                "d"(LSS_SYSCALL_ARG(parent_tidptr)),
+                                "r"(LSS_SYSCALL_ARG(newtls)),
+                                "r"(LSS_SYSCALL_ARG(child_tidptr))
+-                             : "rsp", "memory", "r8", "r10", "r11", "rcx");
++                             : "memory", "r8", "r10", "r11", "rcx");
+       }
+       LSS_RETURN(int, __res);
+     }

@@ -1,0 +1,23 @@
+diff -up chromium-77.0.3865.75/third_party/one_euro_filter/src/one_euro_filter.h.gcc-include-memory chromium-77.0.3865.75/third_party/one_euro_filter/src/one_euro_filter.h
+--- chromium-77.0.3865.75/third_party/one_euro_filter/src/one_euro_filter.h.gcc-include-memory	2019-09-13 14:44:24.962770079 +0200
++++ chromium-77.0.3865.75/third_party/one_euro_filter/src/one_euro_filter.h	2019-09-13 14:44:45.347073612 +0200
+@@ -3,6 +3,8 @@
+ 
+ #include "low_pass_filter.h"
+ 
++#include <memory>
++
+ namespace one_euro_filter {
+ namespace test {
+ class OneEuroFilterTest;
+diff -up chromium-80.0.3987.106/third_party/webrtc/modules/audio_processing/aec3/reverb_model_estimator.h.missing-memory chromium-80.0.3987.106/third_party/webrtc/modules/audio_processing/aec3/reverb_model_estimator.h
+--- chromium-80.0.3987.106/third_party/webrtc/modules/audio_processing/aec3/reverb_model_estimator.h.missing-memory	2020-02-21 12:25:17.206021379 -0500
++++ chromium-80.0.3987.106/third_party/webrtc/modules/audio_processing/aec3/reverb_model_estimator.h	2020-02-21 12:25:31.613759976 -0500
+@@ -12,6 +12,7 @@
+ #define MODULES_AUDIO_PROCESSING_AEC3_REVERB_MODEL_ESTIMATOR_H_
+ 
+ #include <array>
++#include <memory>
+ #include <vector>
+ 
+ #include "absl/types/optional.h"

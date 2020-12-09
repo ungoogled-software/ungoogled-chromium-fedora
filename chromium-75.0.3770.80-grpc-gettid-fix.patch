@@ -1,0 +1,22 @@
+diff -up chromium-75.0.3770.80/third_party/grpc/src/src/core/lib/gpr/log_linux.cc.gettid-fix chromium-75.0.3770.80/third_party/grpc/src/src/core/lib/gpr/log_linux.cc
+--- chromium-75.0.3770.80/third_party/grpc/src/src/core/lib/gpr/log_linux.cc.gettid-fix	2019-06-12 17:05:01.720907204 -0400
++++ chromium-75.0.3770.80/third_party/grpc/src/src/core/lib/gpr/log_linux.cc	2019-06-12 17:06:01.000671370 -0400
+@@ -40,7 +40,8 @@
+ #include <time.h>
+ #include <unistd.h>
+ 
+-static long gettid(void) { return syscall(__NR_gettid); }
++/* renamed to avoid conflict with glibc 'gettid()' */
++static long gettid_gpr(void) { return syscall(__NR_gettid); }
+ 
+ void gpr_log(const char* file, int line, gpr_log_severity severity,
+              const char* format, ...) {
+@@ -70,7 +71,7 @@ void gpr_default_log(gpr_log_func_args*
+   gpr_timespec now = gpr_now(GPR_CLOCK_REALTIME);
+   struct tm tm;
+   static __thread long tid = 0;
+-  if (tid == 0) tid = gettid();
++  if (tid == 0) tid = gettid_gpr();
+ 
+   timer = static_cast<time_t>(now.tv_sec);
+   final_slash = strrchr(args->file, '/');

@@ -1,0 +1,23 @@
+diff -up chromium-86.0.4240.75/media/gpu/vaapi/BUILD.gn.i686permissive chromium-86.0.4240.75/media/gpu/vaapi/BUILD.gn
+--- chromium-86.0.4240.75/media/gpu/vaapi/BUILD.gn.i686permissive	2020-10-14 16:24:17.803206586 -0400
++++ chromium-86.0.4240.75/media/gpu/vaapi/BUILD.gn	2020-10-14 16:24:59.212530721 -0400
+@@ -13,6 +13,10 @@ import("//ui/ozone/ozone.gni")
+ assert(is_linux || is_chromeos)
+ assert(use_vaapi)
+ 
++config("vaapi_permissive") {
++  cflags = [ "-fpermissive" ]
++}
++
+ generate_stubs("libva_stubs") {
+   extra_header = "va_stub_header.fragment"
+   sigs = [ "va.sigs" ]
+@@ -121,6 +125,8 @@ source_set("vaapi") {
+     ]
+   }
+ 
++  configs += [ ":vaapi_permissive" ]
++
+   if (use_x11) {
+     deps += [ "//ui/gfx/x" ]
+     sources += [

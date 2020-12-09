@@ -1,0 +1,13 @@
+diff -up chromium-84.0.4147.125/third_party/ffmpeg/libavcodec/aarch64/videodsp.S.fixme chromium-84.0.4147.125/third_party/ffmpeg/libavcodec/aarch64/videodsp.S
+--- chromium-84.0.4147.125/third_party/ffmpeg/libavcodec/aarch64/videodsp.S.fixme	2020-08-21 15:49:55.565746419 +0000
++++ chromium-84.0.4147.125/third_party/ffmpeg/libavcodec/aarch64/videodsp.S	2020-08-21 15:50:55.592152015 +0000
+@@ -23,6 +23,8 @@ function ff_prefetch_aarch64, export=1
+         prfm            pldl1strm, [x0]
+         prfm            pldl1strm, [x0,  x1]
+         add             x0,  x0,  x1,  lsl #1
+-        b.gt            X(ff_prefetch_aarch64)
++        b.le            1f
++        b               X(ff_prefetch_aarch64)
++     1:
+         ret
+ endfunc

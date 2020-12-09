@@ -1,0 +1,33 @@
+diff -up chromium-71.0.3578.98/third_party/catapult/common/py_vulcanize/py_vulcanize/generate.py.py2 chromium-71.0.3578.98/third_party/catapult/common/py_vulcanize/py_vulcanize/generate.py
+--- chromium-71.0.3578.98/third_party/catapult/common/py_vulcanize/py_vulcanize/generate.py.py2	2018-12-12 17:02:58.000000000 -0500
++++ chromium-71.0.3578.98/third_party/catapult/common/py_vulcanize/py_vulcanize/generate.py	2018-12-14 11:48:22.150229631 -0500
+@@ -58,7 +58,7 @@ def _MinifyJS(input_js):
+ 
+   with tempfile.NamedTemporaryFile() as _:
+     args = [
+-        'python',
++        'python2',
+         rjsmin_path
+     ]
+     p = subprocess.Popen(args,
+@@ -177,7 +177,7 @@ def _MinifyCSS(css_text):
+       os.path.join(py_vulcanize_path, 'third_party', 'rcssmin', 'rcssmin.py'))
+ 
+   with tempfile.NamedTemporaryFile() as _:
+-    rcssmin_args = ['python', rcssmin_path]
++    rcssmin_args = ['python2', rcssmin_path]
+     p = subprocess.Popen(rcssmin_args,
+                          stdin=subprocess.PIPE,
+                          stdout=subprocess.PIPE,
+diff -up chromium-71.0.3578.98/tools/gn/bootstrap/bootstrap.py.py2 chromium-71.0.3578.98/tools/gn/bootstrap/bootstrap.py
+--- chromium-71.0.3578.98/tools/gn/bootstrap/bootstrap.py.py2	2018-12-14 11:48:22.155229522 -0500
++++ chromium-71.0.3578.98/tools/gn/bootstrap/bootstrap.py	2018-12-14 11:49:31.043728244 -0500
+@@ -93,7 +93,7 @@ def main(argv):
+     if not options.debug:
+       gn_gen_args += ' is_debug=false'
+     subprocess.check_call([
+-        gn_path, 'gen', out_dir,
++        gn_path, 'gen', out_dir, ' --script-executable=/usr/bin/python2',
+         '--args=%s' % gn_gen_args, "--root=" + SRC_ROOT
+     ])
+ 

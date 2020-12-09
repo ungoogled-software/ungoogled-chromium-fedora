@@ -1,0 +1,15 @@
+diff -up chromium-86.0.4240.75/chrome/browser/first_run/first_run_internal_linux.cc.etc chromium-86.0.4240.75/chrome/browser/first_run/first_run_internal_linux.cc
+--- chromium-86.0.4240.75/chrome/browser/first_run/first_run_internal_linux.cc.etc	2020-10-14 14:38:42.826660141 -0400
++++ chromium-86.0.4240.75/chrome/browser/first_run/first_run_internal_linux.cc	2020-10-14 14:44:49.906526646 -0400
+@@ -19,9 +19,9 @@ bool IsOrganicFirstRun() {
+ 
+ base::FilePath InitialPrefsPath() {
+   // The standard location of the initial prefs is next to the chrome binary.
++  // ...but we patch it to use /etc/chromium
+   base::FilePath initial_prefs;
+-  if (!base::PathService::Get(base::DIR_EXE, &initial_prefs))
+-    return base::FilePath();
++  initial_prefs = base::FilePath("/etc/chromium");
+   return initial_prefs.AppendASCII(installer::kDefaultMasterPrefs);
+ }
+ 

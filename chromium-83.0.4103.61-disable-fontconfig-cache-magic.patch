@@ -1,0 +1,13 @@
+diff -up chromium-83.0.4103.61/base/test/BUILD.gn.nofontconfigcache chromium-83.0.4103.61/base/test/BUILD.gn
+--- chromium-83.0.4103.61/base/test/BUILD.gn.nofontconfigcache	2020-05-29 12:30:03.409707011 -0400
++++ chromium-83.0.4103.61/base/test/BUILD.gn	2020-05-29 12:30:22.593275137 -0400
+@@ -188,9 +188,6 @@ static_library("test_support") {
+     sources += [ "test_file_util_linux.cc" ]
+     public_deps += [ ":fontconfig_util_linux" ]
+     data_deps = [ "//third_party/test_fonts" ]
+-    if (current_toolchain == host_toolchain) {
+-      data_deps += [ ":do_generate_fontconfig_caches" ]
+-    }
+   }
+ 
+   if (is_mac) {

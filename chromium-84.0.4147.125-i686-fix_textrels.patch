@@ -1,0 +1,12 @@
+diff -up chromium-84.0.4147.125/third_party/ffmpeg/BUILD.gn.i686-textrels chromium-84.0.4147.125/third_party/ffmpeg/BUILD.gn
+--- chromium-84.0.4147.125/third_party/ffmpeg/BUILD.gn.i686-textrels	2020-08-17 09:33:53.153653741 -0400
++++ chromium-84.0.4147.125/third_party/ffmpeg/BUILD.gn	2020-08-17 09:34:25.099564669 -0400
+@@ -68,7 +68,7 @@ if (has_nasm_deps) {
+     }
+ 
+     # See comments on fix_textrels config.
+-    if (use_lld && current_cpu == "x86" && !is_win) {
++    if (current_cpu == "x86" && !is_win) {
+       all_dependent_configs = [ ":fix_textrels" ]
+     }
+   }

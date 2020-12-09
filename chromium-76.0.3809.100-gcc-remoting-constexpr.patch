@@ -1,0 +1,27 @@
+diff -up chromium-76.0.3809.100/remoting/signaling/message_tracker.cc.gcc-constexpr chromium-76.0.3809.100/remoting/signaling/message_tracker.cc
+--- chromium-76.0.3809.100/remoting/signaling/message_tracker.cc.gcc-constexpr	2019-08-09 16:48:08.000000000 +0200
++++ chromium-76.0.3809.100/remoting/signaling/message_tracker.cc	2019-08-20 21:29:14.545465656 +0200
+@@ -9,8 +9,7 @@
+ namespace remoting {
+ 
+ // static
+-const base::TimeDelta MessageTracker::kCleanupInterval =
+-    base::TimeDelta::FromMinutes(2);
++constexpr base::TimeDelta MessageTracker::kCleanupInterval;
+ 
+ MessageTracker::MessageTracker() = default;
+ 
+diff -up chromium-76.0.3809.100/remoting/signaling/message_tracker.h.gcc-constexpr chromium-76.0.3809.100/remoting/signaling/message_tracker.h
+--- chromium-76.0.3809.100/remoting/signaling/message_tracker.h.gcc-constexpr	2019-08-20 22:02:25.625970954 +0200
++++ chromium-76.0.3809.100/remoting/signaling/message_tracker.h	2019-08-20 21:28:23.371952434 +0200
+@@ -36,7 +36,8 @@ class MessageTracker final {
+ 
+   // All IDs older than now - kCleanupInterval will be eventually removed, but
+   // they are not guaranteed to be immediately removed after the interval.
+-  static const base::TimeDelta kCleanupInterval;
++  static constexpr base::TimeDelta kCleanupInterval =
++      base::TimeDelta::FromMinutes(2);
+ 
+   void RemoveExpiredIds();
+ 
+diff -up chromium-76.0.3809.100/remoting/signaling/message_tracker_unittest.cc.gcc-constexpr chromium-76.0.3809.100/remoting/signaling/message_tracker_unittest.cc

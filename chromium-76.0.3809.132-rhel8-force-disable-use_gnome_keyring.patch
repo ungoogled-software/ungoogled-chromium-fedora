@@ -1,0 +1,10 @@
+diff -up chromium-76.0.3809.132/components/os_crypt/features.gni.rhel8 chromium-76.0.3809.132/components/os_crypt/features.gni
+--- chromium-76.0.3809.132/components/os_crypt/features.gni.rhel8	2019-09-06 17:08:01.242314126 -0400
++++ chromium-76.0.3809.132/components/os_crypt/features.gni	2019-09-06 17:08:10.139134707 -0400
+@@ -7,5 +7,5 @@ import("//build/config/ui.gni")
+ declare_args() {
+   # Whether to use libgnome-keyring (deprecated by libsecret).
+   # See http://crbug.com/466975 and http://crbug.com/355223.
+-  use_gnome_keyring = is_desktop_linux && use_glib
++  use_gnome_keyring = false
+ }
