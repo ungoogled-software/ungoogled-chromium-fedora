@@ -4,16 +4,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# This file is obtained from https://src.fedoraproject.org/rpms/chromium/
-# and modified by Akarshan Biswas <akarshanbiswas@fedoraproject.org>. All modifications are also
-# licensed under 3-clause BSD license.
-CHROMIUM_DISTRO_FLAGS=()
-
 # Let the wrapped binary know that it has been run through the wrapper.
-export CHROME_WRAPPER="$(readlink -f "$0")"
+export CHROME_WRAPPER="`readlink -f "$0"`"
 
 HERE="`dirname "$CHROME_WRAPPER"`"
-export CHROME_DESKTOP="ungoogled-chromium.desktop"
+
 # We include some xdg utilities next to the binary, and we want to prefer them
 # over the system versions when we know the system versions are very old. We
 # detect whether the system xdg utilities are sufficiently new to be likely to
@@ -39,19 +34,23 @@ else
 fi
 export LD_LIBRARY_PATH
 
+export CHROME_VERSION_EXTRA="Built from source for @@BUILD_TARGET@@"
+
 # We don't want bug-buddy intercepting our crashes. http://crbug.com/24120
 export GNOME_DISABLE_CRASH_DIALOG=SET_BY_GOOGLE_CHROME
 
 # Disable allow_rgb_configs to fix odd color and vaapi issues with Mesa
 export allow_rgb10_configs=false
 
-CHROMIUM_DISTRO_FLAGS+=" --enable-plugins \
-                         --enable-extensions \
-                         --enable-user-scripts \
-                         --enable-printing \
-                         --disable-sync \
-                         --disable-background-networking \
-                         --force-local-ntp \
-                         --disallow-signin"
+CHROMIUM_DISTRO_FLAGS=" --enable-plugins \
+                        --enable-extensions \
+                        --enable-user-scripts \
+                        --enable-printing \
+                        --enable-gpu-rasterization \
+                        --disable-sync \
+                        --disable-background-networking \
+                        --force-local-ntp \
+                        --disallow-signin \
+                        --auto-ssl-client-auth @@EXTRA_FLAGS@@"
 
-exec -a "$0" "@@CHROMIUMDIR@@/$(basename "$0" | sed 's/\.sh$//')" $CHROMIUM_DISTRO_FLAGS "$@"
+exec -a "$0" "$HERE/@@CHROMIUM_BROWSER_CHANNEL@@" $CHROMIUM_DISTRO_FLAGS "$@"

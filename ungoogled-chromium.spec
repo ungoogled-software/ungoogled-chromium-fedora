@@ -1,8 +1,8 @@
 %define _lto_cflags %{nil}
 
-%global numjobs 10
+%global numjobs 14
 %ifarch aarch64
-%global numjobs 8
+%global numjobs 12
 %endif
 
 # Fancy build status, so we at least know, where we are..
@@ -214,6 +214,7 @@ Patch600:       chromium-default-user-data-dir.patch
 
 # Additional patches:
 Patch700:       chromium-widevine-locations.patch
+Patch701:       chromium-missing-std-vector.patch
 
 
 # Unfortunately, Fedora & Copr forbids uploading sources with patent-encumbered
@@ -550,6 +551,7 @@ browser, ungoogled-chromium is essentially a drop-in replacement for Chromium.
 
 # Additional patches:
 %patch700 -p1 -b .widevine-locations
+%patch701 -p1 -b .missing-std-vector
 
 # Change shebang in all relevant files in this directory and all subdirectories
 # See `man find` for how the `-exec command {} +` syntax works
@@ -630,7 +632,7 @@ UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_custom_libcxx=false'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' target_cpu="arm64"'
 %endif
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gnome_keyring=false use_glib=true'
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gio=true use_pulseaudio=true icu_use_data_file=false'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gio=true use_pulseaudio=true icu_use_data_file = true'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' enable_nacl=false'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_component_ffmpeg=false is_component_build=false'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' blink_symbol_level=0 enable_hangout_services_extension=false'
@@ -1087,7 +1089,6 @@ rm -rf %{buildroot}
 		cp -a snapshot_blob.bin %{buildroot}%{chromium_path}
 		cp -a v8_context_snapshot.bin %{buildroot}%{chromium_path}
 		cp -a xdg-mime xdg-settings %{buildroot}%{chromium_path}
-		cp -a MEIPreload %{buildroot}%{chromium_path}
 		# This is ANGLE, not to be confused with the similarly named files under swiftshader/
 		cp -a libEGL.so* libGLESv2.so* %{buildroot}%{chromium_path}
 
@@ -1170,13 +1171,13 @@ fi
 %dir %{chromium_path}
 %{chromium_path}/*.bin
 %{chromium_path}/chrome_*.pak
+%{chromium_path}/headless_*.pak
 %{chromium_path}/resources.pak
 %{chromium_path}/icudtl.dat
 %{chromium_path}/%{chromium_browser_channel}
 %{chromium_path}/%{chromium_browser_channel}.sh
 %{chromium_path}/libEGL.so*
 %{chromium_path}/libGLESv2.so*
-%{chromium_path}/MEIPreload/
 %ifarch x86_64 i686 aarch64
 %{chromium_path}/swiftshader/
 %endif
