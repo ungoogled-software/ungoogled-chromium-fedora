@@ -32,9 +32,9 @@
 # gn/ninja output folder
 %global builddir out/Release
 
-%if !%{debug_pkg}
+# Debuginfo packages aren't very useful here. If you need to debug
+# you should do a proper debug build (not implemented in this spec yet)
 %global debug_package %{nil}
-%endif
 
 # A switch to disable domain substitution for development purposes.
 %bcond_without domain_substitution
@@ -87,7 +87,7 @@ BuildRequires:  libicu-devel >= 5.4
 
 # For non-RHEL systems
 %global bundleharfbuzz 0
-%global bundleopus 0
+%global bundleopus 1
 %global bundlelibusbx 0
 %global bundlelibwebp 0
 %global bundlelibpng 0
@@ -130,7 +130,6 @@ URL:		https://github.com/Eloston/ungoogled-chromium
 License:	BSD and LGPLv2+ and ASL 2.0 and IJG and MIT and GPLv2+ and ISC and OpenSSL and (MPLv1.1 or GPLv2 or LGPLv2)
 
 ### Chromium Fedora Patches ###
-Patch0:		chromium-70.0.3538.67-sandbox-pie.patch
 # Use /etc/chromium for initial_prefs
 Patch1:		chromium-86.0.4240.75-initial_prefs-etc-path.patch
 # Use gn system files
@@ -439,13 +438,8 @@ BuildRequires:	lohit-devanagari-fonts
 BuildRequires:	lohit-tamil-fonts
 BuildRequires:	google-noto-sans-khmer-fonts
 BuildRequires:	google-noto-emoji-color-fonts
-%if 0%{?fedora} >= 30
 BuildRequires:	google-noto-sans-symbols2-fonts
 BuildRequires:	google-noto-sans-tibetan-fonts
-%else
-Source114:	https://github.com/googlefonts/noto-fonts/blob/master/unhinted/NotoSansSymbols2/NotoSansSymbols2-Regular.ttf
-Source115:	https://github.com/googlefonts/noto-fonts/blob/master/hinted/NotoSansTibetan/NotoSansTibetan-Regular.ttf
-%endif
 %endif
 # using the built from source version on aarch64
 BuildRequires:	ninja-build
@@ -492,34 +486,13 @@ possible. Unlike other Chromium forks that have their own visions of a web
 browser, ungoogled-chromium is essentially a drop-in replacement for Chromium.
 ############################################PREP###########################################################
 %prep
-# %setup -q -T -n chromium-patches-%{patchset_revision} -b 1
 %setup -q -T -n ungoogled-chromium-%{ungoogled_chromium_revision} -b 300
 %setup -q -T -c -n depot_tools -a 2
 %setup -q -n chromium-%{version}
 
-# %global patchset_root %{_builddir}/chromium-patches-%{patchset_revision}
 %global ungoogled_chromium_root %{_builddir}/ungoogled-chromium-%{ungoogled_chromium_revision}
 
-# Apply patchset composed by Stephan Hartmann.
-# %global patchset_apply() %{__scm_apply_patch -p1} <%{patchset_root}/%{1}
-# %patchset_apply chromium-blink-gcc-diagnostic-pragma.patch
-# %patchset_apply chromium-fix-char_traits.patch
-# %patchset_apply chromium-quiche-invalid-offsetof.patch
-# %patchset_apply chromium-78-protobuf-RepeatedPtrField-export.patch
-# %patchset_apply chromium-79-gcc-protobuf-alignas.patch
-# %patchset_apply chromium-80-QuicStreamSendBuffer-deleted-move-constructor.patch
-# %patchset_apply chromium-84-blink-disable-clang-format.patch
-# %patchset_apply chromium-85-DelayNode-cast.patch
-# %patchset_apply chromium-85-FrameWidget-namespace.patch
-# %patchset_apply chromium-85-NearbyConnection-abstract.patch
-# %patchset_apply chromium-85-NearbyShareEncryptedMetadataKey-include.patch
-# %patchset_apply chromium-85-oscillator_node-cast.patch
-# %patchset_apply chromium-85-ostream-operator.patch
-# %patchset_apply chromium-85-ozone-include.patch
-# %patchset_apply chromium-85-sim_hash-include.patch
-
 ### Chromium Fedora Patches ###
-%patch0 -p1 -b .sandboxpie
 %patch1 -p1 -b .etc
 %patch2 -p1 -b .gnsystem
 %patch3 -p1 -b .nolibpngprefix
@@ -679,7 +652,7 @@ UNGOOGLED_CHROMIUM_GN_DEFINES+=' chrome_pgo_phase=0 enable_js_type_check=false e
 export UNGOOGLED_CHROMIUM_GN_DEFINES
 
 # ungoogled-chromium: binary pruning.
-python3 -B %{ungoogled_chromium_root}/utils/prune_binaries.py . %{ungoogled_chromium_root}/pruning.list
+python3 -B %{ungoogled_chromium_root}/utils/prune_binaries.py . %{ungoogled_chromium_root}/pruning.list || true
 
 mkdir -p third_party/node/linux/node-linux-x64/bin
 ln -s %{_bindir}/node third_party/node/linux/node-linux-x64/bin/node
@@ -943,7 +916,6 @@ ln -s %{python2_sitearch}/markupsafe third_party/markupsafe
 export PATH=$PATH:%{_builddir}/depot_tools
 
 build/linux/unbundle/replace_gn_files.py --system-libraries \
-    ffmpeg
 %if 0%{?bundlefontconfig}
 %else
 	fontconfig \
@@ -1018,7 +990,7 @@ if python2 -c 'import google ; print google.__path__' 2> /dev/null ; then \
     exit 1 ; \
 fi
 
-tools/gn/bootstrap/bootstrap.py -v --gn-gen-args "$UNGOOGLED_CHROMIUM_GN_DEFINES"
+tools/gn/bootstrap/bootstrap.py --gn-gen-args="$UNGOOGLED_CHROMIUM_GN_DEFINES"
 %{builddir}/gn --script-executable=%{__python2} gen --args="$UNGOOGLED_CHROMIUM_GN_DEFINES" %{builddir}
 
 # ungoogled-chromium: patches
