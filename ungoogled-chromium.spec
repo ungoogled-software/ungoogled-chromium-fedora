@@ -116,10 +116,11 @@ BuildRequires:  libicu-devel >= 5.4
 %global debug_pkg 0
 
 %global majorversion 87
+%global revision 1
 
 Name:		ungoogled-chromium
 Version:	%{majorversion}.0.4280.88
-Release:	1%{?dist}
+Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
 Summary:	A lightweight approach to removing Google web service dependency, built with all possible codecs
