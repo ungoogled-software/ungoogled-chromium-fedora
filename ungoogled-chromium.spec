@@ -395,12 +395,16 @@ BuildRequires:	pkgconfig(gtk+-3.0)
 BuildRequires:	pkgconfig(gtk+-2.0)
 %endif
 BuildRequires:  python3
-BuildRequires:	/usr/bin/python2
-BuildRequires:	python2-devel
+%if 0%{?fedora} >= 32
+BuildRequires:	python2.7
+%else
+BuildRequires:	python2
+%endif
 %if 0%{?bundlepylibs}
 # Using bundled bits, do nothing.
 %else
 %if 0%{?fedora}
+BuildRequires:	python2-devel
 BuildRequires:	python2-beautifulsoup4
 BuildRequires:	python2-beautifulsoup
 BuildRequires:	python2-html5lib
