@@ -5,17 +5,20 @@ Fedora packaging for [ungoogled-chromium](//github.com/Eloston/ungoogled-chromiu
 ## Downloads
 
 Pre-built binary rpm files can be found on OBS:
+  * Direct Download
+    - [OBS download page](https://software.opensuse.org//download.html?project=home%3Awchen342%3Aungoogled-chromium-fedora&package=ungoogled-chromium)
 
-* OBS (Fedora 33)
-  ```sh
-  # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/Fedora_33/home:wchen342:ungoogled-chromium-fedora.repo
-  # dnf install ungoogled-chromium
-  ```
-* OBS (Fedora 32)
-  ```sh
-  # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/Fedora_32/home:wchen342:ungoogled-chromium-fedora.repo
-  # dnf install ungoogled-chromium
-  ```
+  * RPM repository
+    - OBS (Fedora 33)
+      ```sh
+      # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/Fedora_33/home:wchen342:ungoogled-chromium-fedora.repo
+      # dnf install ungoogled-chromium
+      ```
+    - OBS (Fedora 32)
+      ```sh
+      # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/Fedora_32/home:wchen342:ungoogled-chromium-fedora.repo
+      # dnf install ungoogled-chromium
+      ```
 
 ## Building
 
