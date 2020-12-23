@@ -1180,7 +1180,7 @@ fi
 %{chromium_path}/resources.pak
 %{chromium_path}/icudtl.dat
 %{chromium_path}/%{chromium_browser_channel}
-%{chromium_path}/%{chromium_browser_channel}.sh
+%attr(0755, root, root) %{chromium_path}/%{chromium_browser_channel}.sh
 %{chromium_path}/libEGL.so*
 %{chromium_path}/libGLESv2.so*
 %ifarch x86_64 i686 aarch64
