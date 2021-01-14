@@ -1,6 +1,6 @@
 # ungoogled-chromium-fedora
 
-Fedora packaging for [ungoogled-chromium](//github.com/Eloston/ungoogled-chromium).
+Fedora/RHEL/CentOS packaging for [ungoogled-chromium](//github.com/Eloston/ungoogled-chromium).
 
 ## Downloads
 
@@ -19,8 +19,21 @@ Pre-built binary rpm files can be found on OBS:
       # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/Fedora_32/home:wchen342:ungoogled-chromium-fedora.repo
       # dnf install ungoogled-chromium
       ```
+    - OBS (CentOS 8)
+      ```sh
+      # cd /etc/yum.repos.d/
+      # wget https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/CentOS_8/home:wchen342:ungoogled-chromium-fedora.repo
+      # yum install ungoogled-chromium
+      ```
+    - OBS (CentOS 7)
+      ```sh
+      # cd /etc/yum.repos.d/
+      # wget https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/CentOS_7/home:wchen342:ungoogled-chromium-fedora.repo
+      # yum install ungoogled-chromium
+      ```
 
 ## Building
+The following steps are for Fedora. For CentOS, extra files are needed. See `sources`.
 
 1. Clone this repository
 
