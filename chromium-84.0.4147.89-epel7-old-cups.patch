@@ -1,0 +1,149 @@
+diff -up chromium-84.0.4147.89/chrome/service/cloud_print/print_system_cups.cc.el7cups chromium-84.0.4147.89/chrome/service/cloud_print/print_system_cups.cc
+--- chromium-84.0.4147.89/chrome/service/cloud_print/print_system_cups.cc.el7cups	2020-07-13 14:41:23.000000000 -0400
++++ chromium-84.0.4147.89/chrome/service/cloud_print/print_system_cups.cc	2020-07-15 10:16:30.482337332 -0400
+@@ -725,8 +725,9 @@ int PrintSystemCUPS::PrintFile(const GUR
+   // Use default (local) print server.
+   if (url.is_empty())
+     return cupsPrintFile(name, filename, title, num_options, options);
+-
+-  printing::HttpConnectionCUPS http(url, encryption, /*blocking=*/false);
++  
++  printing::HttpConnectionCUPS http(url, encryption);
++  http.SetBlocking(false);
+   return cupsPrintFile2(http.http(), name, filename, title, num_options,
+                         options);
+ }
+@@ -742,7 +743,8 @@ int PrintSystemCUPS::GetJobs(cups_job_t*
+   if (url.is_empty())
+     return cupsGetJobs(jobs, name, myjobs, whichjobs);
+ 
+-  printing::HttpConnectionCUPS http(url, encryption, /*blocking=*/false);
++  printing::HttpConnectionCUPS http(url, encryption);
++  http.SetBlocking(false);
+   return cupsGetJobs2(http.http(), jobs, name, myjobs, whichjobs);
+ }
+ 
+diff -up chromium-84.0.4147.89/printing/backend/cups_helper.cc.el7cups chromium-84.0.4147.89/printing/backend/cups_helper.cc
+--- chromium-84.0.4147.89/printing/backend/cups_helper.cc.el7cups	2020-07-13 14:41:27.000000000 -0400
++++ chromium-84.0.4147.89/printing/backend/cups_helper.cc	2020-07-15 10:17:37.551296816 -0400
+@@ -33,18 +33,6 @@ namespace printing {
+ // This section contains helper code for PPD parsing for semantic capabilities.
+ namespace {
+ 
+-// Function availability can be tested by checking whether its address is not
+-// nullptr. Weak symbols remove the need for platform specific build flags and
+-// allow for appropriate CUPS usage on platforms with non-uniform version
+-// support, namely Linux.
+-#define WEAK_CUPS_FN(x) extern "C" __attribute__((weak)) decltype(x) x
+-
+-WEAK_CUPS_FN(httpConnect2);
+-
+-// Timeout for establishing a CUPS connection.  It is expected that cupsd is
+-// able to start and respond on all systems within this duration.
+-constexpr base::TimeDelta kCupsTimeout = base::TimeDelta::FromSeconds(5);
+-
+ // CUPS default max copies value (parsed from kCupsMaxCopies PPD attribute).
+ constexpr int32_t kDefaultMaxCopies = 9999;
+ constexpr char kCupsMaxCopies[] = "cupsMaxCopies";
+@@ -552,8 +540,7 @@ const int kDefaultIPPServerPort = 631;
+ // Helper wrapper around http_t structure, with connection and cleanup
+ // functionality.
+ HttpConnectionCUPS::HttpConnectionCUPS(const GURL& print_server_url,
+-                                       http_encryption_t encryption,
+-                                       bool blocking)
++                                       http_encryption_t encryption)
+     : http_(nullptr) {
+   // If we have an empty url, use default print server.
+   if (print_server_url.is_empty())
+@@ -563,17 +550,10 @@ HttpConnectionCUPS::HttpConnectionCUPS(c
+   if (port == url::PORT_UNSPECIFIED)
+     port = kDefaultIPPServerPort;
+ 
+-  if (httpConnect2) {
+-    http_ = httpConnect2(print_server_url.host().c_str(), port,
+-                         /*addrlist=*/nullptr, AF_UNSPEC, encryption,
+-                         blocking ? 1 : 0, kCupsTimeout.InMilliseconds(),
+-                         /*cancel=*/nullptr);
+-  } else {
+-    // Continue to use deprecated CUPS calls because because older Linux
+-    // distribution such as RHEL/CentOS 7 are shipped with CUPS 1.6.
+-    http_ =
+-        httpConnectEncrypt(print_server_url.host().c_str(), port, encryption);
+-  }
++  // Continue to use deprecated CUPS calls because because older Linux
++  // distribution such as RHEL/CentOS 7 are shipped with CUPS 1.6.
++  http_ =
++      httpConnectEncrypt(print_server_url.host().c_str(), port, encryption);
+ 
+   if (!http_) {
+     LOG(ERROR) << "CP_CUPS: Failed connecting to print server: "
+@@ -581,8 +561,6 @@ HttpConnectionCUPS::HttpConnectionCUPS(c
+     return;
+   }
+ 
+-  if (!httpConnect2)
+-    httpBlocking(http_, blocking ? 1 : 0);
+ }
+ 
+ HttpConnectionCUPS::~HttpConnectionCUPS() {
+@@ -590,6 +568,10 @@ HttpConnectionCUPS::~HttpConnectionCUPS(
+     httpClose(http_);
+ }
+ 
++void HttpConnectionCUPS::SetBlocking(bool blocking) {
++  httpBlocking(http_, blocking ? 1 : 0);
++}
++
+ http_t* HttpConnectionCUPS::http() {
+   return http_;
+ }
+diff -up chromium-84.0.4147.89/printing/backend/cups_helper.h.el7cups chromium-84.0.4147.89/printing/backend/cups_helper.h
+--- chromium-84.0.4147.89/printing/backend/cups_helper.h.el7cups	2020-07-13 14:41:27.000000000 -0400
++++ chromium-84.0.4147.89/printing/backend/cups_helper.h	2020-07-15 10:16:30.486337271 -0400
+@@ -23,10 +23,11 @@ struct PrinterSemanticCapsAndDefaults;
+ class PRINTING_EXPORT HttpConnectionCUPS {
+  public:
+   HttpConnectionCUPS(const GURL& print_server_url,
+-                     http_encryption_t encryption,
+-                     bool blocking);
++                     http_encryption_t encryption);
+   ~HttpConnectionCUPS();
+ 
++  void SetBlocking(bool blocking);
++
+   http_t* http();
+ 
+  private:
+diff -up chromium-84.0.4147.89/printing/backend/print_backend_cups.cc.el7cups chromium-84.0.4147.89/printing/backend/print_backend_cups.cc
+--- chromium-84.0.4147.89/printing/backend/print_backend_cups.cc.el7cups	2020-07-13 14:41:27.000000000 -0400
++++ chromium-84.0.4147.89/printing/backend/print_backend_cups.cc	2020-07-15 10:16:30.487337255 -0400
+@@ -250,7 +250,8 @@ int PrintBackendCUPS::GetDests(cups_dest
+   if (print_server_url_.is_empty())
+     return cupsGetDests2(CUPS_HTTP_DEFAULT, dests);
+ 
+-  HttpConnectionCUPS http(print_server_url_, cups_encryption_, blocking_);
++  HttpConnectionCUPS http(print_server_url_, cups_encryption_);
++  http.SetBlocking(blocking_);
+ 
+   // This call must be made in the same scope as |http| because its destructor
+   // closes the connection.
+@@ -276,7 +277,8 @@ base::FilePath PrintBackendCUPS::GetPPD(
+     // connection will timeout after 10 seconds of no data period. And it will
+     // return the same way as if data was completely and successfully
+     // downloaded.
+-    HttpConnectionCUPS http(print_server_url_, cups_encryption_, blocking_);
++    HttpConnectionCUPS http(print_server_url_, cups_encryption_);
++    http.SetBlocking(blocking_);
+     ppd_file_path = cupsGetPPD2(http.http(), name);
+     // Check if the get full PPD, since non-blocking call may simply return
+     // normally after timeout expired.
+@@ -312,7 +314,8 @@ PrintBackendCUPS::ScopedDestination Prin
+     // Use default (local) print server.
+     dest = cupsGetNamedDest(CUPS_HTTP_DEFAULT, printer_name.c_str(), nullptr);
+   } else {
+-    HttpConnectionCUPS http(print_server_url_, cups_encryption_, blocking_);
++    HttpConnectionCUPS http(print_server_url_, cups_encryption_);
++    http.SetBlocking(blocking_);
+     dest = cupsGetNamedDest(http.http(), printer_name.c_str(), nullptr);
+   }
+   return ScopedDestination(dest);

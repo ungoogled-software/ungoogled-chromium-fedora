@@ -1,0 +1,15 @@
+diff -up chromium-85.0.4183.83/ui/gfx/linux/drm_util_linux.cc.el7-old-libdrm chromium-85.0.4183.83/ui/gfx/linux/drm_util_linux.cc
+--- chromium-85.0.4183.83/ui/gfx/linux/drm_util_linux.cc.el7-old-libdrm	2020-08-31 09:38:46.043993882 -0400
++++ chromium-85.0.4183.83/ui/gfx/linux/drm_util_linux.cc	2020-08-31 09:39:21.599906318 -0400
+@@ -6,6 +6,11 @@
+ 
+ #include <drm_fourcc.h>
+ 
++// the libdrm in EL-7 is too old to have this define
++#ifndef DRM_FORMAT_P010
++#define DRM_FORMAT_P010 DRM_FORMAT_INVALID
++#endif
++
+ #include "base/notreached.h"
+ 
+ namespace ui {

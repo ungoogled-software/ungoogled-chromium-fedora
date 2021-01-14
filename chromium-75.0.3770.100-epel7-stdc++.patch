@@ -1,0 +1,11 @@
+diff -up chromium-75.0.3770.100/build/config/BUILD.gn.epel7 chromium-75.0.3770.100/build/config/BUILD.gn
+--- chromium-75.0.3770.100/build/config/BUILD.gn.epel7	2019-06-20 10:10:03.099549006 -0400
++++ chromium-75.0.3770.100/build/config/BUILD.gn	2019-06-20 10:10:21.483158162 -0400
+@@ -267,6 +267,7 @@ config("default_libs") {
+       "dl",
+       "pthread",
+       "rt",
++      "stdc++",
+     ]
+   }
+ }

@@ -1,0 +1,55 @@
+diff -up chromium-86.0.4240.75/sandbox/policy/linux/bpf_cros_amd_gpu_policy_linux.cc.epel7-kcmp chromium-86.0.4240.75/sandbox/policy/linux/bpf_cros_amd_gpu_policy_linux.cc
+--- chromium-86.0.4240.75/sandbox/policy/linux/bpf_cros_amd_gpu_policy_linux.cc.epel7-kcmp	2020-10-19 19:05:20.249786458 -0400
++++ chromium-86.0.4240.75/sandbox/policy/linux/bpf_cros_amd_gpu_policy_linux.cc	2020-10-20 10:50:21.560402023 -0400
+@@ -6,7 +6,24 @@
+ 
+ #include <errno.h>
+ #include <fcntl.h>
+-#include <linux/kcmp.h>
++#ifndef KCMP_FILE
++#define KCMP_FILE 0
++#endif
++#ifndef F_LINUX_SPECIFIC_BASE
++#define F_LINUX_SPECIFIC_BASE 1024
++#endif
++#ifndef F_SEAL_SEAL
++#define F_SEAL_SEAL 0x0001
++#endif
++#ifndef F_SEAL_SHRINK
++#define F_SEAL_SHRINK 0x0002
++#endif
++#ifndef F_SEAL_GROW
++#define F_SEAL_GROW 0x0004
++#endif
++#ifndef F_ADD_SEALS
++#define F_ADD_SEALS (F_LINUX_SPECIFIC_BASE + 9)
++#endif
+ #include <sys/socket.h>
+ 
+ // Some arch's (arm64 for instance) unistd.h don't pull in symbols used here
+diff -up chromium-86.0.4240.75/sandbox/policy/linux/bpf_gpu_policy_linux.cc.epel7-kcmp chromium-86.0.4240.75/sandbox/policy/linux/bpf_gpu_policy_linux.cc
+--- chromium-86.0.4240.75/sandbox/policy/linux/bpf_gpu_policy_linux.cc.epel7-kcmp	2020-10-20 11:58:00.449812627 -0400
++++ chromium-86.0.4240.75/sandbox/policy/linux/bpf_gpu_policy_linux.cc	2020-10-20 11:58:32.919071919 -0400
+@@ -22,6 +22,22 @@
+ #include "sandbox/policy/linux/sandbox_linux.h"
+ #include "sandbox/policy/linux/sandbox_seccomp_bpf_linux.h"
+ 
++#ifndef F_LINUX_SPECIFIC_BASE
++#define F_LINUX_SPECIFIC_BASE 1024
++#endif
++#ifndef F_SEAL_SEAL
++#define F_SEAL_SEAL 0x0001
++#endif
++#ifndef F_SEAL_SHRINK
++#define F_SEAL_SHRINK 0x0002
++#endif
++#ifndef F_SEAL_GROW
++#define F_SEAL_GROW 0x0004
++#endif
++#ifndef F_ADD_SEALS
++#define F_ADD_SEALS (F_LINUX_SPECIFIC_BASE + 9)
++#endif
++
+ using sandbox::bpf_dsl::Allow;
+ using sandbox::bpf_dsl::Arg;
+ using sandbox::bpf_dsl::Error;
