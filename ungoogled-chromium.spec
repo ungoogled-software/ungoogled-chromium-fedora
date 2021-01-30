@@ -5,6 +5,19 @@
 %global numjobs 12
 %endif
 
+# This flag is so I can build things very fast on a giant system.
+# Do not enable in Koji builds.
+# Doesn't work on RHEL 7
+%if 0%{?rhel} == 7
+%global use_all_cpus 0
+%else
+%global use_all_cpus 1
+%endif
+
+%if %{use_all_cpus}
+%global numjobs %{_smp_build_ncpus}
+%endif
+
 # Fancy build status, so we at least know, where we are..
 # %1 where
 # %2 what
@@ -12,14 +25,19 @@
 	export NINJA_STATUS="[%2:%f/%t] " ; \
 	../depot_tools/ninja -j %{numjobs} -C '%1' -vvv '%2'
 
-# We'd like to always have this on.
+# We'd like to always have this on...
+# ... but the libva in EL7 is too old.
+%if 0%{?rhel} == 7
+%global use_vaapi 0
+%else
 %global use_vaapi 1
+%endif
 
 # 2020-08-20: F33+ aarch64 has a binutils bug trying to link clear_key_cdm
 # https://bugzilla.redhat.com/show_bug.cgi?id=1869884
 %global build_clear_key_cdm 1
 
-#Do not turn it on in Fedora copr!
+# NEVER EVER EVER turn this on in official builds
 %global freeworld 0
 %if %{freeworld}
 %global lsuffix freeworld
@@ -45,6 +63,9 @@
 %global chromium_menu_name Ungoogled Chromium
 %global chromium_browser_channel %{name}%{chromium_channel}
 %global chromium_path %{_libdir}/%{name}%{chromium_channel}
+
+# We don't want any libs in these directories to generate Provides
+# Requires is trickier.
 
 # To generate this list, go into %%{buildroot}%%{chromium_path} and run
 # for i in `find . -name "*.so" | sort`; do NAME=`basename -s .so $i`; printf "$NAME|"; done
@@ -139,7 +160,7 @@ BuildRequires:  libicu-devel >= 5.4
 #Build with debugging symbols
 %global debug_pkg 0
 
-%global majorversion 87
+%global majorversion 88
 %global revision 1
 
 %if %{freeworld}
@@ -147,7 +168,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4280.141
+Version:	%{majorversion}.0.4324.104
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -170,7 +191,7 @@ Patch4:		chromium-60.0.3112.78-jpeg-nomangle.patch
 # Do not mangle zlib
 Patch5:		chromium-77.0.3865.75-no-zlib-mangle.patch
 # Do not use unrar code, it is non-free
-Patch6:		chromium-86.0.4240.75-norar.patch
+Patch6:		chromium-88.0.4324.11-norar.patch
 # Use Gentoo's Widevine hack
 # https://gitweb.gentoo.org/repo/gentoo.git/tree/www-client/chromium/files/chromium-widevine-r3.patch
 Patch7:		chromium-71.0.3578.98-widevine-r3.patch
@@ -178,6 +199,8 @@ Patch7:		chromium-71.0.3578.98-widevine-r3.patch
 Patch8:		chromium-83.0.4103.61-disable-fontconfig-cache-magic.patch
 # drop rsp clobber, which breaks gcc9 (thanks to Jeff Law)
 Patch9:	chromium-78.0.3904.70-gcc9-drop-rsp-clobber.patch
+# Try to load widevine from other places
+Patch10:	chromium-86.0.4240.75-widevine-other-locations.patch
 # Try to fix version.py for Rawhide
 Patch11:	chromium-71.0.3578.98-py2-bootstrap.patch
 
@@ -194,33 +217,44 @@ Patch54:	chromium-79-gcc-protobuf-alignas.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-78-protobuf-RepeatedPtrField-export.patch
 Patch55:	chromium-78-protobuf-RepeatedPtrField-export.patch
 # ../../third_party/perfetto/include/perfetto/base/task_runner.h:48:55: error: 'uint32_t' has not been declared
-Patch57:	chromium-80.0.3987.87-missing-cstdint-header.patch
+Patch56:	chromium-80.0.3987.87-missing-cstdint-header.patch
 # Missing <cstring> (thanks c++17)
-Patch58:	chromium-80.0.3987.106-missing-cstring-header.patch
+Patch57:	chromium-80.0.3987.106-missing-cstring-header.patch
 # prepare for using system ffmpeg (clean)
 # http://svnweb.mageia.org/packages/cauldron/chromium-browser-stable/current/SOURCES/chromium-53-ffmpeg-no-deprecation-errors.patch?view=markup
-Patch59:	chromium-53-ffmpeg-no-deprecation-errors.patch
+Patch58:	chromium-53-ffmpeg-no-deprecation-errors.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-84-blink-disable-clang-format.patch
-Patch61:	chromium-84-blink-disable-clang-format.patch
+Patch59:	chromium-84-blink-disable-clang-format.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-fix-char_traits.patch
-Patch62:	chromium-fix-char_traits.patch
+Patch60:	chromium-fix-char_traits.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-87-CursorFactory-include.patch
-Patch63:	chromium-87-CursorFactory-include.patch
+Patch61:	chromium-87-CursorFactory-include.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-87-openscreen-include.patch
-Patch64:	chromium-87-openscreen-include.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-87-ServiceWorkerContainerHost-crash.patch
-Patch65:	chromium-87-ServiceWorkerContainerHost-crash.patch
+Patch62:	chromium-87-openscreen-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-88-AXTreeFormatter-include.patch
+Patch63:	chromium-88-AXTreeFormatter-include.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-88-vaapi-attribute.patch
-Patch66:	chromium-88-vaapi-attribute.patch
-
+Patch64:	chromium-88-vaapi-attribute.patch
 # Silence GCC warnings during gn compile
-Patch68:	chromium-84.0.4147.105-gn-gcc-cleanup.patch
+Patch65:	chromium-84.0.4147.105-gn-gcc-cleanup.patch
 # Fix missing cstring in remoting code
-Patch69:	chromium-84.0.4147.125-remoting-cstring.patch
+Patch66:	chromium-84.0.4147.125-remoting-cstring.patch
 # Apply fix_textrels hack for i686 (even without lld)
-Patch70:	chromium-84.0.4147.125-i686-fix_textrels.patch
+Patch67:	chromium-84.0.4147.125-i686-fix_textrels.patch
 # Work around binutils bug in aarch64 (F33+)
-Patch71:	chromium-84.0.4147.125-aarch64-clearkeycdm-binutils-workaround.patch
+Patch68:	chromium-84.0.4147.125-aarch64-clearkeycdm-binutils-workaround.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-88-BookmarkModelObserver-include.patch
+Patch69:	chromium-88-BookmarkModelObserver-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-88-CompositorFrameReporter-dcheck.patch
+Patch70:	chromium-88-CompositorFrameReporter-dcheck.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-88-dawn-static.patch
+Patch71:	chromium-88-dawn-static.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-88-federated_learning-include.patch
+Patch72:	chromium-88-federated_learning-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-88-ityp-include.patch
+Patch73:	chromium-88-ityp-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-88-StringPool-include.patch
+Patch74:	chromium-88-StringPool-include.patch
 
 # Use lstdc++ on EPEL7 only
 Patch101:	chromium-75.0.3770.100-epel7-stdc++.patch
@@ -245,12 +279,12 @@ Patch109:	chromium-87.0.4280.66-el7-no-sys-random.patch
 
 # VAAPI
 # Upstream turned VAAPI on in Linux in 86
-Patch202:	chromium-86.0.4240.75-enable-hardware-accelerated-mjpeg.patch
+Patch202:	chromium-88.0.4324.11-enable-hardware-accelerated-mjpeg.patch
 Patch203:	chromium-86.0.4240.75-vaapi-i686-fpermissive.patch
 Patch205:	chromium-86.0.4240.75-fix-vaapi-on-intel.patch
 
 # Apply these patches to work around EPEL8 issues
-Patch300:	chromium-76.0.3809.132-rhel8-force-disable-use_gnome_keyring.patch
+Patch300:	chromium-88.0.4324.96-rhel8-force-disable-use_gnome_keyring.patch
 
 # And fixes for new compilers
 Patch400:       chromium-gcc11.patch
@@ -263,17 +297,8 @@ Patch503:       chromium-manpage.patch
 Patch600:       chromium-default-user-data-dir.patch
 
 # Additional patches:
-Patch700:       chromium-widevine-locations.patch
-Patch701:       chromium-missing-std-vector.patch
+Patch700:       chromium-missing-std-vector.patch
 
-
-# Unfortunately, Fedora & Copr forbids uploading sources with patent-encumbered
-# ffmpeg code even if they are never compiled and linked to target binaries,
-# so we must repackage upstream tarballs to satisfy this requirement. However,
-# we cannot simply delete all code of ffmpeg because this will disable support
-# for some commonly-used free codecs such as Ogg Theora. Instead, helper
-# scripts included in official Fedora packages are copied, modified, and used
-# to automate the repackaging work.
 # Use chromium-latest.py to generate clean tarball from released build tarballs, found here:
 # http://build.chromium.org/buildbot/official/
 # For Chromium Fedora use chromium-latest.py --stable --ffmpegclean --ffmpegarm
@@ -313,13 +338,9 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 
 # Add our own appdata file.
 Source21:       %{name}.appdata.xml
-Source22:       chromium-symbolic.svg
-
-# License
-Source25:       LICENSE
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 87.0.4280.141-1
+%global ungoogled_chromium_revision 88.0.4324.104-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -564,6 +585,11 @@ Requires:	libcanberra-gtk3%{_isa}
 Requires:	libcanberra-gtk2%{_isa}
 %endif
 
+%if 0%{?fedora}
+# This enables support for u2f tokens
+Requires:	u2f-hidraw-policy
+%endif
+
 %if 0%{?rhel} == 7
 ExclusiveArch:  x86_64 i686
 %else
@@ -573,13 +599,6 @@ ExclusiveArch:	x86_64 i686 aarch64
 # For selinux scriptlet
 Requires(post): /usr/sbin/semanage
 Requires(post): /usr/sbin/restorecon
-
-#Some recommendations
-%if 0%{?rhel} == 7
-# Recommends is not backported
-%else
-Recommends:     libva-utils
-%endif
 
 %if %{?freeworld}
 %description
@@ -634,6 +653,7 @@ Requires: minizip%{_isa}
 %patch7 -p1 -b .widevine-hack
 %patch8 -p1 -b .nofontconfigcache
 %patch9 -p1 -b .gcc9
+%patch10 -p1 -b .widevine-other-locations
 %patch11 -p1 -b .py2
 
 # Short term fixes (usually gcc and backports)
@@ -645,19 +665,25 @@ Requires: minizip%{_isa}
 %patch53 -p1 -b .gcc-include-memory
 %patch54 -p1 -b .base-gcc-no-alignas
 %patch55 -p1 -b .protobuf-export
-%patch57 -p1 -b .missing-cstdint
-%patch58 -p1 -b .missing-cstring
-%patch59 -p1 -b .ffmpeg-deprecations
-%patch61 -p1 -b .blink-disable-clang-format
-%patch62 -p1 -b .fix-char_traits
-%patch63 -p1 -b .CursorFactory-include
-%patch64 -p1 -b .openscreen-include
-%patch65 -p1 -b .ServiceWorkerContainerHost-crash
-%patch66 -p1 -b .vaapi-attribute
-%patch68 -p1 -b .gn-gcc-cleanup
-%patch69 -p1 -b .remoting-cstring
-%patch70 -p1 -b .i686-textrels
-%patch71 -p1 -b .aarch64-clearkeycdm-binutils-workaround
+%patch56 -p1 -b .missing-cstdint
+%patch57 -p1 -b .missing-cstring
+%patch58 -p1 -b .ffmpeg-deprecations
+%patch59 -p1 -b .blink-disable-clang-format
+%patch60 -p1 -b .fix-char_traits
+%patch61 -p1 -b .CursorFactory-include
+%patch62 -p1 -b .openscreen-include
+%patch63 -p1 -b .AXTreeFormatter-include
+%patch64 -p1 -b .vaapi-attribute
+%patch65 -p1 -b .gn-gcc-cleanup
+%patch66 -p1 -b .remoting-cstring
+%patch67 -p1 -b .i686-textrels
+%patch68 -p1 -b .aarch64-clearkeycdm-binutils-workaround
+%patch69 -p1 -b .BookmarkModelObserver-include
+%patch70 -p1 -b .CompositorFrameReporter-dcheck
+%patch71 -p1 -b .dawn-static
+%patch72 -p1 -b .federated_learning-include
+%patch73 -p1 -b .ityp-include
+%patch74 -p1 -b .StringPool-include
 
 # EPEL specific patches
 %if 0%{?rhel} == 7
@@ -695,8 +721,7 @@ Requires: minizip%{_isa}
 %patch600 -p1 -b .default-user-dir
 
 # Additional patches:
-%patch700 -p1 -b .widevine-locations
-%patch701 -p1 -b .missing-std-vector
+%patch700 -p1 -b .missing-std-vector
 
 # Change shebang in all relevant files in this directory and all subdirectories
 # See `man find` for how the `-exec command {} +` syntax works
@@ -802,17 +827,19 @@ UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gnome_keyring=false use_glib=true'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gio=true use_pulseaudio=true icu_use_data_file = true'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' enable_nacl=false'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_component_ffmpeg=false is_component_build=false'
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' blink_symbol_level=0 enable_hangout_services_extension=false'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' enable_hangout_services_extension=false'
 %if %{debug_pkg}
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' symbol_level=1'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' blink_symbol_level=1 symbol_level=1'
 %else
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' symbol_level=0'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' blink_symbol_level=0 symbol_level=0'
 %endif
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' enable_widevine=true'
 %if %{use_vaapi}
 %if 0%{?fedora} >= 28
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_vaapi=true'
 %endif
+%else
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_vaapi=false'
 %endif
 %if 0%{?fedora}
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' rtc_use_pipewire=true rtc_link_pipewire=true'
@@ -932,6 +959,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
     'third_party/flatbuffers' \
 	'third_party/fontconfig' \
 	'third_party/freetype' \
+	'third_party/fusejs' \
 	'third_party/glslang' \
 	'third_party/google_input_tools' \
 	'third_party/google_input_tools/third_party/closure_library' \
@@ -971,6 +999,8 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/libvpx/source/libvpx/third_party/x86inc' \
 	'third_party/libwebm' \
 	'third_party/libwebp' \
+	'third_party/libx11' \
+	'third_party/libxcb-keysyms' \
 	'third_party/libxml' \
 	'third_party/libxml/chromium' \
 	'third_party/libxslt' \
@@ -1051,6 +1081,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/swiftshader/third_party/SPIRV-Headers' \
 	'third_party/tcmalloc' \
 	'third_party/test_fonts' \
+	'third_party/ukey2' \
     'third_party/usb_ids' \
 	'third_party/usrsctp' \
 	'third_party/vulkan' \
@@ -1068,6 +1099,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/widevine' \
     'third_party/woff2' \
 	'third_party/wuffs' \
+	'third_party/x11proto' \
 	'third_party/xcbproto' \
     'third_party/xdg-utils' \
 	'third_party/zxcvbn-cpp' \
@@ -1175,9 +1207,6 @@ if python2 -c 'import google ; print google.__path__' 2> /dev/null ; then \
     exit 1 ; \
 fi
 
-tools/gn/bootstrap/bootstrap.py --gn-gen-args="$UNGOOGLED_CHROMIUM_GN_DEFINES"
-%{builddir}/gn --script-executable=%{__python2} gen --args="$UNGOOGLED_CHROMIUM_GN_DEFINES" %{builddir}
-
 # ungoogled-chromium: patches
 python3 -B %{ungoogled_chromium_root}/utils/patches.py apply .  %{ungoogled_chromium_root}/patches
 
@@ -1189,6 +1218,9 @@ python3 -B %{ungoogled_chromium_root}/utils/domain_substitution.py apply . \
   -f %{ungoogled_chromium_root}/domain_substitution.list \
   -c %{_builddir}/dsc.tar.gz
 %endif
+
+tools/gn/bootstrap/bootstrap.py --gn-gen-args="$UNGOOGLED_CHROMIUM_GN_DEFINES"
+%{builddir}/gn --script-executable=%{__python2} gen --args="$UNGOOGLED_CHROMIUM_GN_DEFINES" %{builddir}
 
 %if %{bundlelibusbx}
 # no hackity hack hack
@@ -1269,8 +1301,8 @@ rm -rf %{buildroot}
 	ln -s %{chromium_path}/%{chromium_browser_channel}.sh %{buildroot}%{_bindir}/%{chromium_browser_channel}
 	mkdir -p %{buildroot}%{_mandir}/man1/
 
-    pushd %{builddir}
-        cp -a *.pak locales resources icudtl.dat %{buildroot}%{chromium_path}
+	pushd %{builddir}
+		cp -a *.pak locales resources icudtl.dat %{buildroot}%{chromium_path}
 		%ifarch x86_64 i686 aarch64
 			cp -a swiftshader %{buildroot}%{chromium_path}
 		%endif
@@ -1333,8 +1365,8 @@ rm -rf %{buildroot}
 	mkdir -p %{buildroot}%{_datadir}/applications/
 	desktop-file-install --dir %{buildroot}%{_datadir}/applications %{SOURCE4}
 
-	install -D -m0644 %{SOURCE21} ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{name}.appdata.xml
-	appstream-util validate-relax --nonet ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{name}.appdata.xml
+	install -D -m0644 %{SOURCE21} ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{chromium_browser_channel}.appdata.xml
+	appstream-util validate-relax --nonet ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{chromium_browser_channel}.appdata.xml
 
 	mkdir -p %{buildroot}%{_datadir}/gnome-control-center/default-apps/
 	cp -a %{SOURCE9} %{buildroot}%{_datadir}/gnome-control-center/default-apps/
@@ -1449,10 +1481,15 @@ fi
 
 %{_bindir}/chromedriver
 %{chromium_path}/chromedriver
+
 %endif
 
 %changelog
-* Wed Jan 1 2021 wchen342 <feiyu2817@gmail.com> - 87.0.4280.141-1
+* Fri Jan 29 2021 wchen342 <feiyu2817@gmail.com> - 88.0.4324.104-1
+- Update Chromium to 88.0.4324.104
+- Update ungoogled-chromium to 88.0.4324.104-1
+
+* Fri Jan 1 2021 wchen342 <feiyu2817@gmail.com> - 87.0.4280.141-1
 - Update Chromium to 87.0.4280.141
 - Update ungoogled-chromium to 87.0.4280.141-1
 - Add back RHEL (CentOS) support
