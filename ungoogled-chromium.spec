@@ -168,7 +168,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4324.104
+Version:	%{majorversion}.0.4324.146
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -340,7 +340,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source21:       %{name}.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 88.0.4324.104-1
+%global ungoogled_chromium_revision 88.0.4324.146-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -677,7 +677,6 @@ Requires: minizip%{_isa}
 %patch65 -p1 -b .gn-gcc-cleanup
 %patch66 -p1 -b .remoting-cstring
 %patch67 -p1 -b .i686-textrels
-%patch68 -p1 -b .aarch64-clearkeycdm-binutils-workaround
 %patch69 -p1 -b .BookmarkModelObserver-include
 %patch70 -p1 -b .CompositorFrameReporter-dcheck
 %patch71 -p1 -b .dawn-static
@@ -1485,6 +1484,10 @@ fi
 %endif
 
 %changelog
+* Wed Feb 03 2021 wchen342 <feiyu2817@gmail.com> - 88.0.4324.146-1
+- Update Chromium to 88.0.4324.146
+- Update ungoogled-chromium to 88.0.4324.146-1
+
 * Fri Jan 29 2021 wchen342 <feiyu2817@gmail.com> - 88.0.4324.104-1
 - Update Chromium to 88.0.4324.104
 - Update ungoogled-chromium to 88.0.4324.104-1
