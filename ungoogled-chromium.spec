@@ -168,7 +168,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4324.146
+Version:	%{majorversion}.0.4324.150
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -1484,6 +1484,9 @@ fi
 %endif
 
 %changelog
+* Fri Feb 05 2021 wchen342 <feiyu2817@gmail.com> - 88.0.4324.150-1
+- Update Chromium to 88.0.4324.150
+
 * Wed Feb 03 2021 wchen342 <feiyu2817@gmail.com> - 88.0.4324.146-1
 - Update Chromium to 88.0.4324.146
 - Update ungoogled-chromium to 88.0.4324.146-1
