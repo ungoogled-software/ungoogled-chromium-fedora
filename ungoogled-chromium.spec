@@ -168,7 +168,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4324.150
+Version:	%{majorversion}.0.4324.182
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -255,6 +255,9 @@ Patch72:	chromium-88-federated_learning-include.patch
 Patch73:	chromium-88-ityp-include.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-88-StringPool-include.patch
 Patch74:	chromium-88-StringPool-include.patch
+# Fix sandbox code to properly handle the new way that glibc handles fstat in Fedora 34+
+# Thanks to Kevin Kofler for the fix.
+Patch75:	chromium-88.0.4324.96-fstatfix.patch
 
 # Use lstdc++ on EPEL7 only
 Patch101:	chromium-75.0.3770.100-epel7-stdc++.patch
@@ -340,7 +343,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source21:       %{name}.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 88.0.4324.146-1
+%global ungoogled_chromium_revision 88.0.4324.182-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -683,6 +686,7 @@ Requires: minizip%{_isa}
 %patch72 -p1 -b .federated_learning-include
 %patch73 -p1 -b .ityp-include
 %patch74 -p1 -b .StringPool-include
+%patch75 -p1 -b .fstatfix
 
 # EPEL specific patches
 %if 0%{?rhel} == 7
@@ -1484,6 +1488,9 @@ fi
 %endif
 
 %changelog
+* Fri Feb 19 2021 wchen342 <feiyu2817@gmail.com> - 88.0.4324.182-1
+- Update Chromium to 88.0.4234.182
+
 * Fri Feb 05 2021 wchen342 <feiyu2817@gmail.com> - 88.0.4324.150-1
 - Update Chromium to 88.0.4324.150
 
