@@ -1,7 +1,7 @@
-diff -up chromium-86.0.4240.75/chrome/common/chrome_paths.cc.widevine-other-locations chromium-86.0.4240.75/chrome/common/chrome_paths.cc
---- chromium-86.0.4240.75/chrome/common/chrome_paths.cc.widevine-other-locations	2020-10-14 14:47:36.000823668 -0400
-+++ chromium-86.0.4240.75/chrome/common/chrome_paths.cc	2020-10-14 14:54:49.347207638 -0400
-@@ -379,6 +379,16 @@ bool PathProvider(int key, base::FilePat
+diff -up chromium-89.0.4389.72/chrome/common/chrome_paths.cc.widevine-other-locations chromium-89.0.4389.72/chrome/common/chrome_paths.cc
+--- chromium-89.0.4389.72/chrome/common/chrome_paths.cc.widevine-other-locations	2021-03-04 12:04:50.005010200 -0500
++++ chromium-89.0.4389.72/chrome/common/chrome_paths.cc	2021-03-04 12:38:54.650855614 -0500
+@@ -339,6 +339,16 @@ bool PathProvider(int key, base::FilePat
  #if (defined(OS_LINUX) || defined(OS_CHROMEOS)) && \
      BUILDFLAG(BUNDLE_WIDEVINE_CDM)
      case chrome::DIR_BUNDLED_WIDEVINE_CDM:
@@ -17,4 +17,4 @@ diff -up chromium-86.0.4240.75/chrome/common/chrome_paths.cc.widevine-other-loca
 +      }
        if (!GetComponentDirectory(&cur))
          return false;
- #if !defined(OS_CHROMEOS)
+ #if !BUILDFLAG(IS_CHROMEOS_ASH)
