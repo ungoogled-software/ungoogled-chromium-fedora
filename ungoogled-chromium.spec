@@ -168,7 +168,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4389.82
+Version:	%{majorversion}.0.4389.90
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -275,7 +275,7 @@ Patch203:	chromium-86.0.4240.75-vaapi-i686-fpermissive.patch
 Patch205:	chromium-86.0.4240.75-fix-vaapi-on-intel.patch
 
 # Apply these patches to work around EPEL8 issues
-Patch300:	chromium-88.0.4324.96-rhel8-force-disable-use_gnome_keyring.patch
+Patch300:	chromium-89.0.4389.82-rhel8-force-disable-use_gnome_keyring.patch
 
 # And fixes for new compilers
 Patch400:       chromium-gcc11.patch
@@ -330,7 +330,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source21:       %{name}.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 89.0.4389.82-1
+%global ungoogled_chromium_revision 89.0.4389.90-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -390,9 +390,6 @@ BuildRequires:	nodejs
 BuildRequires:	nss-devel >= 3.26
 BuildRequires:	pciutils-devel
 BuildRequires:	pulseaudio-libs-devel
-
-# For X11/xshmfence.h
-BuildRequires: libxshmfence-devel
 
 # For screen sharing on Wayland, currently Fedora only thing - no epel
 %if 0%{?fedora}
@@ -459,6 +456,7 @@ BuildRequires:	libva-devel
 BuildRequires:	libwebp-devel
 %endif
 BuildRequires:	libxslt-devel
+BuildRequires:  libxshmfence-devel
 # Same here, it seems.
 # BuildRequires:	libyuv-devel
 BuildRequires:	mesa-libGL-devel
