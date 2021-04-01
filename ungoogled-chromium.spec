@@ -168,7 +168,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4389.90
+Version:	%{majorversion}.0.4389.114
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -246,6 +246,18 @@ Patch75:	chromium-88.0.4324.96-fstatfix.patch
 Patch76:	chromium-88.0.4324.182-rawhide-gcc-std-max-fix.patch
 # Fix symbol visibility with gcc on swiftshader's libEGL
 Patch77:	chromium-88.0.4324.182-gcc-fix-swiftshader-libEGL-visibility.patch
+# Include support for futex_time64 (64bit time on 32bit platforms)
+# https://chromium.googlesource.com/chromium/src/+/955a586c63c4f99fb734e44221db63f5b2ca25a9%5E%21/#F0
+Patch78:       chromium-89.0.4389.82-support-futex_time64.patch
+# Do not download proprietary widevine module in the background (thanks Debian)
+Patch79:       chromium-89.0.4389.82-widevine-no-download.patch
+# Fix crashes with components/cast_*
+# Thanks to Gentoo
+# https://gitweb.gentoo.org/repo/gentoo.git/plain/www-client/chromium/files/chromium-89-EnumTable-crash.patch
+Patch80:       chromium-89-EnumTable-crash.patch
+# Fix build issues with newer libva
+# https://github.com/chromium/chromium/commit/7ae60470cdb0bea4548a0f5e8271b359f9450c79.patch
+Patch81:       7ae60470cdb0bea4548a0f5e8271b359f9450c79.patch
 
 # Use lstdc++ on EPEL7 only
 Patch101:	chromium-75.0.3770.100-epel7-stdc++.patch
@@ -330,7 +342,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source21:       %{name}.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 89.0.4389.90-1
+%global ungoogled_chromium_revision 89.0.4389.114-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -673,6 +685,10 @@ Requires: minizip%{_isa}
 %patch76 -p1 -b .sigstkszfix
 %endif
 %patch77 -p1 -b .gcc-swiftshader-visibility
+%patch78 -p1 -b .futex-time64
+%patch79 -p1 -b .widevine-no-download
+%patch80 -p1 -b .EnumTable-crash
+%patch81 -p1 -b .libva-forward-compat
 
 
 # EPEL specific patches
@@ -1466,6 +1482,9 @@ fi
 %endif
 
 %changelog
+* Thu Apr  1 2021 wchen342 <feiyu2817@gmail.com> - 89.0.4389.114-1
+- Update Chromium to 89.0.4389.114
+
 * Tue Mar  9 2021 wchen342 <feiyu2817@gmail.com> - 89.0.4389.82-1
 - Update Chromium to 89.0.4389.82
 
