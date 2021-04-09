@@ -631,7 +631,7 @@ browser, ungoogled-chromium is essentially a drop-in replacement for Chromium.
 %if 0%{?fedora} >= 30
 Requires: minizip-compat%{_isa}
 %else
-%if %{?rhel} == 7
+%if 0%{?rhel} == 7
 # Do nothing
 %else
 Requires: minizip%{_isa}
