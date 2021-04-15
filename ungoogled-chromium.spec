@@ -522,18 +522,18 @@ BuildRequires:	zlib-devel
 # dont need fonts for this
 %else
 %if 0%{?rhel} >= 7
-Source100:	https://github.com/googlefonts/Arimo/raw/master/fonts/ttf/Arimo-Bold.ttf
-Source101:	https://github.com/googlefonts/Arimo/raw/master/fonts/ttf/Arimo-BoldItalic.ttf
-Source102:	https://github.com/googlefonts/Arimo/raw/master/fonts/ttf/Arimo-Italic.ttf
-Source103:	https://github.com/googlefonts/Arimo/raw/master/fonts/ttf/Arimo-Regular.ttf
-Source104:	https://github.com/google/fonts/raw/master/apache/cousine/Cousine-Bold.ttf
-Source105:	https://github.com/google/fonts/raw/master/apache/cousine/Cousine-BoldItalic.ttf
-Source106:	https://github.com/google/fonts/raw/master/apache/cousine/Cousine-Italic.ttf
-Source107:	https://github.com/google/fonts/raw/master/apache/cousine/Cousine-Regular.ttf
-Source108:	https://github.com/google/fonts/raw/master/apache/tinos/Tinos-Bold.ttf
-Source109:	https://github.com/google/fonts/raw/master/apache/tinos/Tinos-BoldItalic.ttf
-Source110:	https://github.com/google/fonts/raw/master/apache/tinos/Tinos-Italic.ttf
-Source111:	https://github.com/google/fonts/raw/master/apache/tinos/Tinos-Regular.ttf
+Source100:	https://github.com/googlefonts/Arimo/raw/main/fonts/ttf/Arimo-Bold.ttf
+Source101:	https://github.com/googlefonts/Arimo/raw/main/fonts/ttf/Arimo-BoldItalic.ttf
+Source102:	https://github.com/googlefonts/Arimo/raw/main/fonts/ttf/Arimo-Italic.ttf
+Source103:	https://github.com/googlefonts/Arimo/raw/main/fonts/ttf/Arimo-Regular.ttf
+Source104:	https://github.com/google/fonts/raw/main/apache/cousine/Cousine-Bold.ttf
+Source105:	https://github.com/google/fonts/raw/main/apache/cousine/Cousine-BoldItalic.ttf
+Source106:	https://github.com/google/fonts/raw/main/apache/cousine/Cousine-Italic.ttf
+Source107:	https://github.com/google/fonts/raw/main/apache/cousine/Cousine-Regular.ttf
+Source108:	https://github.com/google/fonts/raw/main/apache/tinos/Tinos-Bold.ttf
+Source109:	https://github.com/google/fonts/raw/main/apache/tinos/Tinos-BoldItalic.ttf
+Source110:	https://github.com/google/fonts/raw/main/apache/tinos/Tinos-Italic.ttf
+Source111:	https://github.com/google/fonts/raw/main/apache/tinos/Tinos-Regular.ttf
 %else
 BuildRequires:	google-croscore-arimo-fonts
 BuildRequires:	google-croscore-cousine-fonts
