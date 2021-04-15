@@ -163,6 +163,9 @@ BuildRequires:  libicu-devel >= 5.4
 %global majorversion 89
 %global revision 1
 
+# Depot tool revision
+%global depot_tool_revision 428143ee24c5f084c8dfb38cd17f07b4f7ba9bf7
+
 %if %{freeworld}
 Name:		ungoogled-chromium%{nsuffix}
 %else
@@ -312,7 +315,7 @@ Source0:	https://commondatastorage.googleapis.com/chromium-browser-official/chro
 Source0:	chromium-%{version}-clean.tar.xz
 %endif
 # https://chromium.googlesource.com/chromium/tools/depot_tools.git/+archive/7e7a454f9afdddacf63e10be48f0eab603be654e.tar.gz
-Source2:	depot_tools.git-master.tar.gz
+Source2:	https://chromium.googlesource.com/chromium/tools/depot_tools.git/+archive/%{depot_tool_revision}.tar.gz
 Source3:	%{name}.sh
 Source4:	%{chromium_browser_channel}.desktop
 # Also, only used if you want to reproduce the clean tarball.
