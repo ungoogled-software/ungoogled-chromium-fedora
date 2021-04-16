@@ -1,3 +1,5 @@
+%global obs 0
+
 %define _lto_cflags %{nil}
 
 %global numjobs 14
@@ -163,8 +165,8 @@ BuildRequires:  libicu-devel >= 5.4
 %global majorversion 89
 %global revision 1
 
-# Depot tool revision
-%global depot_tool_revision 428143ee24c5f084c8dfb38cd17f07b4f7ba9bf7
+# Depot tools revision
+%global depot_tools_revision 428143ee24c5f084c8dfb38cd17f07b4f7ba9bf7
 
 %if %{freeworld}
 Name:		ungoogled-chromium%{nsuffix}
@@ -309,13 +311,13 @@ Patch700:       chromium-missing-std-vector.patch
 # For Chromium Fedora use chromium-latest.py --stable --ffmpegclean --ffmpegarm
 # If you want to include the ffmpeg arm sources append the --ffmpegarm switch
 # https://commondatastorage.googleapis.com/chromium-browser-official/chromium-%%{version}.tar.xz
-%if %{freeworld}
+%if %{freeworld} || %{obs}
 Source0:	https://commondatastorage.googleapis.com/chromium-browser-official/chromium-%{version}.tar.xz
 %else
 Source0:	chromium-%{version}-clean.tar.xz
 %endif
-# https://chromium.googlesource.com/chromium/tools/depot_tools.git/+archive/7e7a454f9afdddacf63e10be48f0eab603be654e.tar.gz
-Source2:	https://chromium.googlesource.com/chromium/tools/depot_tools.git/+archive/%{depot_tool_revision}.tar.gz
+# Packaged by OBS from https://chromium.googlesource.com/chromium/tools/depot_tools.git
+Source2:	depot_tools-%{depot_tools_revision}.tar.xz
 Source3:	%{name}.sh
 Source4:	%{chromium_browser_channel}.desktop
 # Also, only used if you want to reproduce the clean tarball.
@@ -644,10 +646,27 @@ Requires: minizip%{_isa}
 ############################################PREP###########################################################
 %prep
 %setup -q -T -n ungoogled-chromium-%{ungoogled_chromium_revision} -b 300
-%setup -q -T -c -n depot_tools -a 2
+%setup -q -T -n depot_tools-%{depot_tools_revision} -b 2
 %setup -q -n chromium-%{version}
 
 %global ungoogled_chromium_root %{_builddir}/ungoogled-chromium-%{ungoogled_chromium_revision}
+
+ln -s depot_tools-%{depot_tools_revision} ../depot_tools
+
+%if %{obs}
+(
+    cd ..
+    for i in chromium-%{version}.tar.xz chromium-latest.py clean_ffmpeg.sh get_free_ffmpeg_source_files.py
+    do
+        j=../SOURCES/$i
+        chmod +x $j
+        ln -s $j $i
+    done
+    printf 'md5  %s\n' "$(md5sum chromium-%{version}.tar.xz)" > chromium-%{version}.tar.xz.hashes
+    ./chromium-latest.py --version %{version} --ffmpegclean --ffmpegarm --prep
+    rm -f *.tar.xz* *.sh *.py
+)
+%endif
 
 ### Chromium Fedora Patches ###
 %patch1 -p1 -b .etc
