@@ -20,6 +20,13 @@
 %global numjobs %{_smp_build_ncpus}
 %endif
 
+%if %{obs}
+%global numjobs 8
+%ifarch aarch64
+%global numjobs 4
+%endif
+%endif
+
 # Fancy build status, so we at least know, where we are..
 # %1 where
 # %2 what
