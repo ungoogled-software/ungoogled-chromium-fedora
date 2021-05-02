@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-RELEASES='rhel:7 rhel:8 fedora:32 fedora:33'
+RELEASES='rhel:7 rhel:8 fedora:33 fedora:34'
 
 for i in git curl xmlstarlet rpmspec
 do

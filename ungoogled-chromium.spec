@@ -1,4 +1,5 @@
 %global obs 0
+%global ninja_verbose 0
 
 %define _lto_cflags %{nil}
 
@@ -30,9 +31,15 @@
 # Fancy build status, so we at least know, where we are..
 # %1 where
 # %2 what
+%if %{ninja_verbose}
 %global build_target() \
 	export NINJA_STATUS="[%2:%f/%t] " ; \
 	../depot_tools/ninja -j %{numjobs} -C '%1' -vvv '%2'
+%else
+%global build_target() \
+	export NINJA_STATUS="[%2:%f/%t] " ; \
+	../depot_tools/ninja -j %{numjobs} -C '%1' '%2'
+%endif
 
 # We'd like to always have this on...
 # ... but the libva in EL7 is too old.
@@ -169,18 +176,18 @@ BuildRequires:  libicu-devel >= 5.4
 #Build with debugging symbols
 %global debug_pkg 0
 
-%global majorversion 89
+%global majorversion 90
 %global revision 1
 
 # Depot tools revision
-%global depot_tools_revision 428143ee24c5f084c8dfb38cd17f07b4f7ba9bf7
+%global depot_tools_revision 7d690053cbb9914e0c014ec10fe181bfcd6ec2dc
 
 %if %{freeworld}
 Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4389.114
+Version:	%{majorversion}.0.4430.93
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -231,17 +238,16 @@ Patch57:	chromium-89.0.4389.72-missing-cstring-header.patch
 # prepare for using system ffmpeg (clean)
 # http://svnweb.mageia.org/packages/cauldron/chromium-browser-stable/current/SOURCES/chromium-53-ffmpeg-no-deprecation-errors.patch?view=markup
 Patch58:	chromium-53-ffmpeg-no-deprecation-errors.patch
-# https://github.com/stha09/chromium-patches/blob/chromium-89-patchset-7/chromium-89-dawn-include.patch
-Patch60:	chromium-89-dawn-include.patch
-# https://github.com/stha09/chromium-patches/blob/chromium-89-patchset-7/chromium-89-quiche-dcheck.patch
-Patch61:	chromium-89-quiche-dcheck.patch
-# https://github.com/stha09/chromium-patches/blob/chromium-89-patchset-7/chromium-89-quiche-private.patch
-Patch62:	chromium-89-quiche-private.patch
-# https://github.com/stha09/chromium-patches/blob/chromium-89-patchset-7/chromium-89-skia-CropRect.patch
-Patch63:	chromium-89-skia-CropRect.patch
-# https://github.com/stha09/chromium-patches/blob/chromium-89-patchset-7/chromium-89-AXTreeSerializer-include.patch
-Patch64:	chromium-89-AXTreeSerializer-include.patch
-
+# https://github.com/stha09/chromium-patches/blob/master/chromium-90-angle-constexpr.patch
+Patch59:	chromium-90-angle-constexpr.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-90-CrossThreadCopier-qualification.patch
+Patch60:	chromium-90-CrossThreadCopier-qualification.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-90-quantization_utils-include.patch
+Patch61:	chromium-90-quantization_utils-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-90-ruy-include.patch
+Patch62:	chromium-90-ruy-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-90-TokenizedOutput-include.patch
+Patch63:	chromium-90-TokenizedOutput-include.patch
 
 # Silence GCC warnings during gn compile
 Patch65:	chromium-84.0.4147.105-gn-gcc-cleanup.patch
@@ -253,30 +259,27 @@ Patch67:	chromium-84.0.4147.125-i686-fix_textrels.patch
 Patch68:	chromium-84.0.4147.125-aarch64-clearkeycdm-binutils-workaround.patch
 # Fix sandbox code to properly handle the new way that glibc handles fstat in Fedora 34+
 # Thanks to Kevin Kofler for the fix.
-Patch75:	chromium-88.0.4324.96-fstatfix.patch
+Patch75:	chromium-90.0.4430.72-fstatfix.patch
 # Rawhide (f35) glibc defines SIGSTKSZ as a long instead of a constant
 Patch76:	chromium-88.0.4324.182-rawhide-gcc-std-max-fix.patch
 # Fix symbol visibility with gcc on swiftshader's libEGL
 Patch77:	chromium-88.0.4324.182-gcc-fix-swiftshader-libEGL-visibility.patch
 # Include support for futex_time64 (64bit time on 32bit platforms)
 # https://chromium.googlesource.com/chromium/src/+/955a586c63c4f99fb734e44221db63f5b2ca25a9%5E%21/#F0
-Patch78:       chromium-89.0.4389.82-support-futex_time64.patch
+Patch78:	chromium-89.0.4389.82-support-futex_time64.patch
 # Do not download proprietary widevine module in the background (thanks Debian)
-Patch79:       chromium-89.0.4389.82-widevine-no-download.patch
+Patch79:	chromium-90.0.4430.72-widevine-no-download.patch
 # Fix crashes with components/cast_*
 # Thanks to Gentoo
-# https://gitweb.gentoo.org/repo/gentoo.git/plain/www-client/chromium/files/chromium-89-EnumTable-crash.patch
-Patch80:       chromium-89-EnumTable-crash.patch
-# Fix build issues with newer libva
-# https://github.com/chromium/chromium/commit/7ae60470cdb0bea4548a0f5e8271b359f9450c79.patch
-Patch81:       7ae60470cdb0bea4548a0f5e8271b359f9450c79.patch
+Patch80:	https://gitweb.gentoo.org/repo/gentoo.git/plain/www-client/chromium/files/chromium-89-EnumTable-crash.patch
+
 
 # Use lstdc++ on EPEL7 only
 Patch101:	chromium-75.0.3770.100-epel7-stdc++.patch
 # el7 only patch
 Patch102:	chromium-80.0.3987.132-el7-noexcept.patch
 # No linux/kcmp.h on EPEL7
-Patch103:	chromium-86.0.4240.75-epel7-no-kcmp-h.patch
+Patch103:	chromium-90.0.4430.85-epel7-no-kcmp-h.patch
 # Use old cups (chromium's code workaround breaks on gcc)
 # Revert: https://github.com/chromium/chromium/commit/c3213f8779ddc427e89d982514185ed5e4c94e91
 Patch104:	chromium-84.0.4147.89-epel7-old-cups.patch
@@ -289,8 +292,6 @@ Patch106:	chromium-77-clang.patch
 # libdrm on EL7 is rather old and chromium assumes newer
 # This gets us by for now
 Patch108:	chromium-85.0.4183.83-el7-old-libdrm.patch
-# EL-7 does not have sys/random.h
-Patch109:	chromium-87.0.4280.66-el7-no-sys-random.patch
 
 # VAAPI
 # Upstream turned VAAPI on in Linux in 86
@@ -354,7 +355,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source21:       %{name}.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 89.0.4389.114-1
+%global ungoogled_chromium_revision 90.0.4430.93-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -417,7 +418,7 @@ BuildRequires:	pulseaudio-libs-devel
 
 # For screen sharing on Wayland, currently Fedora only thing - no epel
 %if 0%{?fedora}
-BuildRequires:	pkgconfig(libpipewire-0.2)
+BuildRequires:	pkgconfig(libpipewire-0.3)
 %endif
 
 # for /usr/bin/appstream-util
@@ -480,7 +481,7 @@ BuildRequires:	libva-devel
 BuildRequires:	libwebp-devel
 %endif
 BuildRequires:	libxslt-devel
-BuildRequires:  libxshmfence-devel
+BuildRequires:	libxshmfence-devel
 # Same here, it seems.
 # BuildRequires:	libyuv-devel
 BuildRequires:	mesa-libGL-devel
@@ -566,11 +567,12 @@ BuildRequires:	google-noto-sans-khmer-fonts
 BuildRequires:	google-noto-emoji-color-fonts
 %if 0%{?fedora} >= 30
 BuildRequires:	google-noto-sans-symbols2-fonts
-BuildRequires:	google-noto-sans-tibetan-fonts
 %else
 Source114:	https://github.com/googlefonts/noto-fonts/raw/master/unhinted/ttf/NotoSansSymbols2/NotoSansSymbols2-Regular.ttf
-Source115:	NotoSansTibetan-Regular.ttf
 %endif
+# There used to be a copy of this font file here, but it looks like NotoSansTibetan is no more.
+# And yet, the chromium code still wants it.
+Source115:	NotoSansTibetan-Regular.ttf
 %endif
 # using the built from source version on aarch64
 BuildRequires:	ninja-build
@@ -700,15 +702,16 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch56 -p1 -b .missing-cstdint
 %patch57 -p1 -b .missing-cstring
 %patch58 -p1 -b .ffmpeg-deprecations
-%patch60 -p1 -b .dawn-include
-%patch61 -p1 -b .quiche-dcheck
-%patch62 -p1 -b .quiche-private
-%patch63 -p1 -b .skia-CropRect
-%patch64 -p1 -b .AXTreeSerializer-include
+%patch59 -p1 -b .angle-constexpr
+%patch60 -p1 -b .CrossThreadCopier-qualification
+%patch61 -p1 -b .quantization_utils-include
+%patch62 -p1 -b .ruy-include
+%patch63 -p1 -b .TokenizedOutput
+
 %patch65 -p1 -b .gn-gcc-cleanup
 %patch66 -p1 -b .remoting-cstring
 %patch67 -p1 -b .i686-textrels
-# %%patch68 -p1 -b .aarch64-clearkeycdm-binutils-workaround
+%patch68 -p1 -b .aarch64-clearkeycdm-binutils-workaround
 %patch75 -p1 -b .fstatfix
 %if 0%{?fedora} >= 35
 %patch76 -p1 -b .sigstkszfix
@@ -717,7 +720,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch78 -p1 -b .futex-time64
 %patch79 -p1 -b .widevine-no-download
 %patch80 -p1 -b .EnumTable-crash
-%patch81 -p1 -b .libva-forward-compat
 
 
 # EPEL specific patches
@@ -727,7 +729,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch103 -p1 -b .epel7-kcmp
 %patch104 -p1 -b .el7cups
 %patch108 -p1 -b .el7-old-libdrm
-%patch109 -p1 -b .el7-no-sys-random
 %endif
 
 %if 0%{?rhel} == 8
@@ -830,10 +831,11 @@ cp -a /usr/share/fonts/lohit-devanagari/Lohit-Devanagari.ttf /usr/share/fonts/lo
 cp -a /usr/share/fonts/google-noto/NotoSansKhmer-Regular.ttf .
 cp -a /usr/share/fonts/google-noto-emoji/NotoColorEmoji.ttf .
 %if 0%{?fedora} >= 30
-cp -a /usr/share/fonts/google-noto/NotoSansSymbols2-Regular.ttf /usr/share/fonts/google-noto/NotoSansTibetan-Regular.ttf .
+cp -a /usr/share/fonts/google-noto/NotoSansSymbols2-Regular.ttf .
 %else
-cp -a %{SOURCE114} %{SOURCE115} .
+cp -a %{SOURCE114} .
 %endif
+cp -a %{SOURCE115} .
 popd
 %endif
 
@@ -858,14 +860,14 @@ UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_custom_libcxx=false'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' target_cpu="arm64"'
 %endif
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gnome_keyring=false use_glib=true'
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gio=true use_pulseaudio=true icu_use_data_file = true'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gio=true use_pulseaudio=true icu_use_data_file=true'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' enable_nacl=false'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_component_ffmpeg=false is_component_build=false'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' enable_hangout_services_extension=false'
 %if %{debug_pkg}
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' blink_symbol_level=1 symbol_level=1'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' blink_symbol_level=1 symbol_level=1 exclude_unwind_tables=false'
 %else
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' blink_symbol_level=0 symbol_level=0'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' blink_symbol_level=0 symbol_level=0 exclude_unwind_tables=true'
 %endif
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' enable_widevine=true'
 %if %{use_vaapi}
@@ -878,7 +880,7 @@ UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_vaapi=false'
 %if 0%{?fedora}
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' rtc_use_pipewire=true rtc_link_pipewire=true'
 %endif
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' chrome_pgo_phase=0 enable_js_type_check=false enable_mse_mpeg2ts_stream_parser=true enable_nacl_nonsfi=false enable_one_click_signin=false enable_reading_list=false enable_remoting=false enable_reporting=false enable_service_discovery=false exclude_unwind_tables=true safe_browsing_mode=0'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' chrome_pgo_phase=0 enable_js_type_check=false enable_mse_mpeg2ts_stream_parser=true enable_nacl_nonsfi=false enable_one_click_signin=false enable_reading_list=false enable_remoting=false enable_reporting=false enable_service_discovery=false safe_browsing_mode=0'
 export UNGOOGLED_CHROMIUM_GN_DEFINES
 
 # ungoogled-chromium: binary pruning.
@@ -978,14 +980,19 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/devtools-frontend/src/front_end/third_party/puppeteer' \
 	'third_party/devtools-frontend/src/front_end/third_party/wasmparser' \
 	'third_party/dom_distiller_js' \
+	'third_party/eigen3' \
 	'third_party/emoji-segmenter' \
 	'third_party/expat' \
+	'third_party/farmhash' \
+	'third_party/fdlibm' \
 	'third_party/ffmpeg' \
+	'third_party/fft2d' \
 	'third_party/flac' \
     'third_party/flatbuffers' \
 	'third_party/fontconfig' \
 	'third_party/freetype' \
 	'third_party/fusejs' \
+	'third_party/gemmlowp' \
 	'third_party/google_input_tools' \
 	'third_party/google_input_tools/third_party/closure_library' \
 	'third_party/google_input_tools/third_party/closure_library/third_party/closure' \
@@ -1005,10 +1012,12 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/libXNVCtrl' \
 	'third_party/libaddressinput' \
 	'third_party/libaom' \
+	'third_party/libaom/source/libaom/third_party/fastfeat' \
 	'third_party/libaom/source/libaom/third_party/vector' \
 	'third_party/libaom/source/libaom/third_party/x86inc' \
 	'third_party/libavif' \
 	'third_party/libdrm' \
+	'third_party/libgav1' \
 	'third_party/libgifcodec' \
 	'third_party/libjingle' \
 	'third_party/libjpeg_turbo' \
@@ -1031,6 +1040,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/libxml/chromium' \
 	'third_party/libxslt' \
 	'third_party/libyuv' \
+	'third_party/libzip' \
 	'third_party/lottie' \
 	'third_party/lss' \
 	'third_party/lzma_sdk' \
@@ -1068,7 +1078,6 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/pdfium/third_party/skia_shared' \
 	'third_party/perfetto' \
 	'third_party/perfetto/protos/third_party/chromium' \
-	'third_party/perfetto/protos/third_party/pprof' \
 	'third_party/pffft' \
     'third_party/ply' \
 	'third_party/polymer' \
@@ -1083,6 +1092,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/re2' \
 %endif
 	'third_party/rnnoise' \
+	'third_party/ruy' \
 	'third_party/s2cellid' \
 	'third_party/schema_org' \
 	'third_party/securemessage' \
@@ -1106,10 +1116,17 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/swiftshader/third_party/subzero' \
 	'third_party/swiftshader/third_party/SPIRV-Headers' \
 	'third_party/tcmalloc' \
+	'third_party/tensorflow-text' \
 	'third_party/test_fonts' \
+	'third_party/tflite' \
+	'third_party/tflite/src/third_party/eigen3' \
+	'third_party/tflite/src/third_party/fft2d' \
+	'third_party/tflite-support' \
+	'third_party/tint' \
 	'third_party/ukey2' \
     'third_party/usb_ids' \
 	'third_party/usrsctp' \
+	'third_party/utf' \
 	'third_party/vulkan' \
 	'third_party/wayland' \
 	'third_party/web-animations-js' \
@@ -1511,6 +1528,9 @@ fi
 %endif
 
 %changelog
+* Sun May  2 2021 wchen342 <feiyu2817@gmail.com> - 90.0.4430.93-1
+- update Chromium to 90.0.4430.93
+
 * Thu Apr  1 2021 wchen342 <feiyu2817@gmail.com> - 89.0.4389.114-1
 - Update Chromium to 89.0.4389.114
 
