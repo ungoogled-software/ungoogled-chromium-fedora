@@ -1,7 +1,7 @@
 diff -up chromium-90.0.4430.85/mojo/core/channel_linux.cc.epel7-kcmp chromium-90.0.4430.85/mojo/core/channel_linux.cc
 --- chromium-90.0.4430.85/mojo/core/channel_linux.cc.epel7-kcmp	2021-04-27 11:42:46.207245608 -0400
 +++ chromium-90.0.4430.85/mojo/core/channel_linux.cc	2021-04-27 11:43:21.941841419 -0400
-@@ -37,6 +37,22 @@
+@@ -37,6 +37,25 @@
  #include "mojo/core/core.h"
  #include "mojo/core/embedder/features.h"
  
@@ -19,6 +19,9 @@ diff -up chromium-90.0.4430.85/mojo/core/channel_linux.cc.epel7-kcmp chromium-90
 +#endif
 +#ifndef F_ADD_SEALS
 +#define F_ADD_SEALS (F_LINUX_SPECIFIC_BASE + 9)
++#endif
++#ifndef F_GET_SEALS
++#define F_GET_SEALS (F_LINUX_SPECIFIC_BASE + 10)
 +#endif
 +
  namespace mojo {
@@ -79,3 +82,46 @@ diff -up chromium-90.0.4430.85/sandbox/policy/linux/bpf_gpu_policy_linux.cc.epel
  using sandbox::bpf_dsl::Allow;
  using sandbox::bpf_dsl::Arg;
  using sandbox::bpf_dsl::Error;
+diff -up chromium-90.0.4430.93/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.cc.epel7-kcmp chromium-90.0.4430.93/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.cc
+--- chromium-90.0.4430.93/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.cc.epel7-kcmp	2021-04-27 16:08:22.416365113 -0400
++++ chromium-90.0.4430.93/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.cc	2021-04-27 16:08:43.571725851 -0400
+@@ -57,6 +57,25 @@
+ 
+ #endif  // defined(OS_ANDROID)
+ 
++#ifndef F_LINUX_SPECIFIC_BASE
++#define F_LINUX_SPECIFIC_BASE 1024
++#endif
++#ifndef F_SEAL_SEAL
++#define F_SEAL_SEAL 0x0001
++#endif
++#ifndef F_SEAL_SHRINK
++#define F_SEAL_SHRINK 0x0002
++#endif
++#ifndef F_SEAL_GROW
++#define F_SEAL_GROW 0x0004
++#endif
++#ifndef F_ADD_SEALS
++#define F_ADD_SEALS (F_LINUX_SPECIFIC_BASE + 9)
++#endif
++#ifndef F_GET_SEALS
++#define F_GET_SEALS (F_LINUX_SPECIFIC_BASE + 10)
++#endif
++
+ #if defined(__arm__) && !defined(MAP_STACK)
+ #define MAP_STACK 0x20000  // Daisy build environment has old headers.
+ #endif
+diff -up chromium-90.0.4430.93/ui/events/ozone/evdev/event_converter_evdev_impl.cc.epel7-kcmp chromium-90.0.4430.93/ui/events/ozone/evdev/event_converter_evdev_impl.cc
+--- chromium-90.0.4430.93/ui/events/ozone/evdev/event_converter_evdev_impl.cc.epel7-kcmp	2021-04-28 09:55:12.941124592 -0400
++++ chromium-90.0.4430.93/ui/events/ozone/evdev/event_converter_evdev_impl.cc	2021-04-28 09:55:42.071601437 -0400
+@@ -16,6 +16,10 @@
+ #include "ui/events/keycodes/dom/keycode_converter.h"
+ #include "ui/events/ozone/evdev/device_event_dispatcher_evdev.h"
+ 
++#ifndef SW_PEN_INSERTED
++#define SW_PEN_INSERTED		0x0f  /* set = pen inserted */
++#endif
++
+ namespace ui {
+ 
+ namespace {

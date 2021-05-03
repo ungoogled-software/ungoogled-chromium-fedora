@@ -3,11 +3,6 @@
 
 %define _lto_cflags %{nil}
 
-%global numjobs 14
-%ifarch aarch64
-%global numjobs 12
-%endif
-
 # This flag is so I can build things very fast on a giant system.
 # Do not enable in Koji builds.
 # Doesn't work on RHEL 7
@@ -21,11 +16,9 @@
 %global numjobs %{_smp_build_ncpus}
 %endif
 
-%if %{obs}
 %global numjobs 8
 %ifarch aarch64
 %global numjobs 4
-%endif
 %endif
 
 # Fancy build status, so we at least know, where we are..
@@ -42,8 +35,8 @@
 %endif
 
 # We'd like to always have this on...
-# ... but the libva in EL7 is too old.
-%if 0%{?rhel} == 7
+# ... but the libva in EL7 (and EL8) is too old.
+%if 0%{?rhel} == 7 || 0%{?rhel} == 8
 %global use_vaapi 0
 %else
 %global use_vaapi 1
@@ -278,8 +271,8 @@ Patch80:	https://gitweb.gentoo.org/repo/gentoo.git/plain/www-client/chromium/fil
 Patch101:	chromium-75.0.3770.100-epel7-stdc++.patch
 # el7 only patch
 Patch102:	chromium-80.0.3987.132-el7-noexcept.patch
-# No linux/kcmp.h on EPEL7
-Patch103:	chromium-90.0.4430.85-epel7-no-kcmp-h.patch
+# Work around old and missing headers on EPEL7
+Patch103:	chromium-90.0.4430.93-epel7-old-headers-workarounds.patch
 # Use old cups (chromium's code workaround breaks on gcc)
 # Revert: https://github.com/chromium/chromium/commit/c3213f8779ddc427e89d982514185ed5e4c94e91
 Patch104:	chromium-84.0.4147.89-epel7-old-cups.patch
@@ -292,6 +285,10 @@ Patch106:	chromium-77-clang.patch
 # libdrm on EL7 is rather old and chromium assumes newer
 # This gets us by for now
 Patch108:	chromium-85.0.4183.83-el7-old-libdrm.patch
+# error: no matching function for call to 'std::basic_string<char>::erase(std::basic_string<char>::const_iterator, __gnu_cxx::__normal_iterator<const char*, std::basic_string<char> >&)'
+#   33 |   property_name.erase(property_name.cbegin(), cur);
+# Not sure how this EVER worked anywhere, but it only seems to fail on EPEL-7.
+Patch109:	chromium-90.0.4430.93-epel7-erase-fix.patch
 
 # VAAPI
 # Upstream turned VAAPI on in Linux in 86
@@ -313,6 +310,7 @@ Patch600:       chromium-default-user-data-dir.patch
 
 # Additional patches:
 Patch700:       chromium-missing-std-vector.patch
+Patch701:       ungoogled-chromium-fix.patch
 
 # Use chromium-latest.py to generate clean tarball from released build tarballs, found here:
 # http://build.chromium.org/buildbot/official/
@@ -726,9 +724,10 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %if 0%{?rhel} == 7
 # %%patch101 -p1 -b .epel7
 # %%patch102 -p1 -b .el7-noexcept
-%patch103 -p1 -b .epel7-kcmp
+%patch103 -p1 -b .epel7-header-workarounds
 %patch104 -p1 -b .el7cups
 %patch108 -p1 -b .el7-old-libdrm
+%patch109 -p1 -b .el7-erase-fix
 %endif
 
 %if 0%{?rhel} == 8
@@ -757,6 +756,7 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 
 # Additional patches:
 %patch700 -p1 -b .missing-std-vector
+%patch701 -p1 -b .ungoogled-chromium-fix
 
 # Change shebang in all relevant files in this directory and all subdirectories
 # See `man find` for how the `-exec command {} +` syntax works

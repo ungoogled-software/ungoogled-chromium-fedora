@@ -1,0 +1,20 @@
+diff -up chromium-90.0.4430.93/components/ui_devtools/views/view_element.cc.erase-fix chromium-90.0.4430.93/components/ui_devtools/views/view_element.cc
+--- chromium-90.0.4430.93/components/ui_devtools/views/view_element.cc.erase-fix	2021-04-29 14:00:38.779932160 -0400
++++ chromium-90.0.4430.93/components/ui_devtools/views/view_element.cc	2021-04-29 14:00:54.684194321 -0400
+@@ -23,14 +23,14 @@ namespace {
+ // Remove any custom editor "prefixes" from the property name. The prefixes must
+ // not be valid identifier characters.
+ void StripPrefix(std::string& property_name) {
+-  auto cur = property_name.cbegin();
++  auto cur = property_name.begin();
+   for (; cur < property_name.cend(); ++cur) {
+     if ((*cur >= 'A' && *cur <= 'Z') || (*cur >= 'a' && *cur <= 'z') ||
+         *cur == '_') {
+       break;
+     }
+   }
+-  property_name.erase(property_name.cbegin(), cur);
++  property_name.erase(property_name.begin(), cur);
+ }
+ 
+ }  // namespace
