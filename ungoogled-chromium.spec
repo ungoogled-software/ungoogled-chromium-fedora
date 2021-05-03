@@ -264,7 +264,7 @@ Patch78:	chromium-89.0.4389.82-support-futex_time64.patch
 Patch79:	chromium-90.0.4430.72-widevine-no-download.patch
 # Fix crashes with components/cast_*
 # Thanks to Gentoo
-Patch80:	https://gitweb.gentoo.org/repo/gentoo.git/plain/www-client/chromium/files/chromium-89-EnumTable-crash.patch
+Patch80:	chromium-89-EnumTable-crash.patch
 
 
 # Use lstdc++ on EPEL7 only
