@@ -6,29 +6,31 @@ Fedora/RHEL/CentOS packaging for [ungoogled-chromium](//github.com/Eloston/ungoo
 
 Pre-built binary rpm files can be found on OBS:
   * Direct Download
-    - [OBS download page](https://software.opensuse.org//download.html?project=home%3Awchen342%3Aungoogled-chromium-fedora&package=ungoogled-chromium)
+    - [OBS Production Project](https://build.opensuse.org/project/show/home:ungoogled_chromium)
+    - [OBS Development Project](https://build.opensuse.org/project/show/home:ungoogled_chromium:testing)
+    - [My OBS project download page](https://software.opensuse.org//download.html?project=home%3Awchen342%3Aungoogled-chromium-fedora&package=ungoogled-chromium)
 
   * RPM repository
-    - OBS (Fedora 33)
+    - OBS (Fedora 34)
       ```sh
-      # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/Fedora_33/home:wchen342:ungoogled-chromium-fedora.repo
+      # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:/ungoogled_chromium/Fedora_34/home:ungoogled_chromium.repo
       # dnf install ungoogled-chromium
       ```
-    - OBS (Fedora 32)
+    - OBS (Fedora 33)
       ```sh
-      # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/Fedora_32/home:wchen342:ungoogled-chromium-fedora.repo
+      # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:/ungoogled_chromium/Fedora_33/home:ungoogled_chromium.repo
       # dnf install ungoogled-chromium
       ```
     - OBS (CentOS 8)
       ```sh
       # cd /etc/yum.repos.d/
-      # wget https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/CentOS_8/home:wchen342:ungoogled-chromium-fedora.repo
+      # wget https://download.opensuse.org/repositories/home:/ungoogled_chromium/CentOS_8/home:ungoogled_chromium.repo
       # yum install ungoogled-chromium
       ```
     - OBS (CentOS 7)
       ```sh
       # cd /etc/yum.repos.d/
-      # wget https://download.opensuse.org/repositories/home:wchen342:ungoogled-chromium-fedora/CentOS_7/home:wchen342:ungoogled-chromium-fedora.repo
+      # wget https://download.opensuse.org/repositories/home:/ungoogled_chromium/CentOS_7/home:ungoogled_chromium.repo
       # yum install ungoogled-chromium
       ```
 
