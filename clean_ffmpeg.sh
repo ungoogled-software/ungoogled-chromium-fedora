@@ -127,6 +127,7 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavcodec/pixblockdsp.h \
 		libavcodec/pixels.h \
 		libavcodec/png.h \
+		libavcodec/pngdsp.h \
 		libavcodec/put_bits.h \
 		libavcodec/qpeldsp.h \
 		libavcodec/ratecontrol.h \
@@ -297,7 +298,6 @@ mp3_files="	libavcodec/aarch64/aacpsdsp_init_aarch64.c \
 		libavcodec/sbrdsp.c \
 		libavcodec/sbrdsp_template.c \
 		libavcodec/sinewin.c \
-		libavcodec/sinewin_fixed.c \
 		libavcodec/x86/dct_init.c \
 		libavcodec/x86/dct32.asm \
 		libavcodec/x86/imdct36.asm \

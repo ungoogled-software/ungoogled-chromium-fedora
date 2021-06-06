@@ -169,18 +169,18 @@ BuildRequires:  libicu-devel >= 5.4
 #Build with debugging symbols
 %global debug_pkg 0
 
-%global majorversion 90
+%global majorversion 91
 %global revision 1
 
 # Depot tools revision
-%global depot_tools_revision 7d690053cbb9914e0c014ec10fe181bfcd6ec2dc
+%global depot_tools_revision 1cabb17575917b73ec2e270d4187656c20b1ab0c
 
 %if %{freeworld}
 Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4430.212
+Version:	%{majorversion}.0.4472.77
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -193,7 +193,7 @@ License:	BSD and LGPLv2+ and ASL 2.0 and IJG and MIT and GPLv2+ and ISC and Open
 
 ### Chromium Fedora Patches ###
 # Use /etc/chromium for initial_prefs
-Patch1:		chromium-89.0.4389.72-initial_prefs-etc-path.patch
+Patch1:		chromium-91.0.4472.77-initial_prefs-etc-path.patch
 # Use gn system files
 Patch2:		chromium-67.0.3396.62-gn-system.patch
 # Do not prefix libpng functions
@@ -208,7 +208,7 @@ Patch6:		chromium-89.0.4389.72-norar.patch
 # https://gitweb.gentoo.org/repo/gentoo.git/tree/www-client/chromium/files/chromium-widevine-r3.patch
 Patch7:		chromium-71.0.3578.98-widevine-r3.patch
 # Disable fontconfig cache magic that breaks remoting
-Patch8:		chromium-83.0.4103.61-disable-fontconfig-cache-magic.patch
+Patch8:		chromium-91.0.4472.77-disable-fontconfig-cache-magic.patch
 # drop rsp clobber, which breaks gcc9 (thanks to Jeff Law)
 Patch9:	chromium-78.0.3904.70-gcc9-drop-rsp-clobber.patch
 # Try to load widevine from other places
@@ -231,16 +231,20 @@ Patch57:	chromium-89.0.4389.72-missing-cstring-header.patch
 # prepare for using system ffmpeg (clean)
 # http://svnweb.mageia.org/packages/cauldron/chromium-browser-stable/current/SOURCES/chromium-53-ffmpeg-no-deprecation-errors.patch?view=markup
 Patch58:	chromium-53-ffmpeg-no-deprecation-errors.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-90-angle-constexpr.patch
-Patch59:	chromium-90-angle-constexpr.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-90-CrossThreadCopier-qualification.patch
-Patch60:	chromium-90-CrossThreadCopier-qualification.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-90-quantization_utils-include.patch
-Patch61:	chromium-90-quantization_utils-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-91-pcscan-vector-types.patch
+Patch59:	chromium-91-pcscan-vector-types.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-91-libyuv-aarch64.patch
+Patch60:	chromium-91-libyuv-aarch64.patch
+# Update third_party/highway to 0.12.2
+# this is needed for sane arm/aarch64
+Patch61:	chromium-91.0.4472.77-update-highway-0.12.2.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-90-ruy-include.patch
 Patch62:	chromium-90-ruy-include.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-90-TokenizedOutput-include.patch
-Patch63:	chromium-90-TokenizedOutput-include.patch
+# Extra CXXFLAGS for aarch64
+Patch63:	chromium-91.0.4472.77-aarch64-cxxflags-addition.patch
+# Fix issue where closure_compiler thinks java is only allowed in android builds
+# https://bugs.chromium.org/p/chromium/issues/detail?id=1192875
+Patch64:	chromium-91.0.4472.77-java-only-allowed-in-android-builds.patch
 
 # Silence GCC warnings during gn compile
 Patch65:	chromium-84.0.4147.105-gn-gcc-cleanup.patch
@@ -257,9 +261,6 @@ Patch75:	chromium-90.0.4430.72-fstatfix.patch
 Patch76:	chromium-88.0.4324.182-rawhide-gcc-std-max-fix.patch
 # Fix symbol visibility with gcc on swiftshader's libEGL
 Patch77:	chromium-88.0.4324.182-gcc-fix-swiftshader-libEGL-visibility.patch
-# Include support for futex_time64 (64bit time on 32bit platforms)
-# https://chromium.googlesource.com/chromium/src/+/955a586c63c4f99fb734e44221db63f5b2ca25a9%5E%21/#F0
-Patch78:	chromium-89.0.4389.82-support-futex_time64.patch
 # Do not download proprietary widevine module in the background (thanks Debian)
 Patch79:	chromium-90.0.4430.72-widevine-no-download.patch
 # Fix crashes with components/cast_*
@@ -289,6 +290,10 @@ Patch108:	chromium-85.0.4183.83-el7-old-libdrm.patch
 #   33 |   property_name.erase(property_name.cbegin(), cur);
 # Not sure how this EVER worked anywhere, but it only seems to fail on EPEL-7.
 Patch109:	chromium-90.0.4430.93-epel7-erase-fix.patch
+# Again, not sure how epel8 is the only one to hit this...
+# AARCH64 neon symbols need to be prefixed too to prevent multiple definition issue at linktime
+Patch110:	chromium-90.0.4430.93-epel8-aarch64-libpng16-symbol-prefixes.patch
+
 
 # VAAPI
 # Upstream turned VAAPI on in Linux in 86
@@ -310,7 +315,6 @@ Patch600:       chromium-default-user-data-dir.patch
 
 # Additional patches:
 Patch700:       chromium-missing-std-vector.patch
-Patch701:       ungoogled-chromium-fix.patch
 
 # Use chromium-latest.py to generate clean tarball from released build tarballs, found here:
 # http://build.chromium.org/buildbot/official/
@@ -353,7 +357,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source21:       %{name}.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 90.0.4430.212-1
+%global ungoogled_chromium_revision 91.0.4472.77-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -378,6 +382,7 @@ BuildRequires:	harfbuzz-devel >= 2.4.0
 %endif
 BuildRequires:	libatomic
 BuildRequires:	libcap-devel
+BuildRequires:	libcurl-devel
 %if 0%{?bundlelibdrm}
 #nothing
 %else
@@ -700,12 +705,12 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch56 -p1 -b .missing-cstdint
 %patch57 -p1 -b .missing-cstring
 %patch58 -p1 -b .ffmpeg-deprecations
-%patch59 -p1 -b .angle-constexpr
-%patch60 -p1 -b .CrossThreadCopier-qualification
-%patch61 -p1 -b .quantization_utils-include
+%patch59 -p1 -b .pcscan-vector-types
+%patch60 -p1 -b .libyuv-aarch64
+%patch61 -p1 -b .update-highway-0.12.2
 %patch62 -p1 -b .ruy-include
-%patch63 -p1 -b .TokenizedOutput
-
+%patch63 -p1 -b .aarch64-cxxflags-addition
+%patch64 -p1 -b .java-only-allowed
 %patch65 -p1 -b .gn-gcc-cleanup
 %patch66 -p1 -b .remoting-cstring
 %patch67 -p1 -b .i686-textrels
@@ -715,7 +720,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch76 -p1 -b .sigstkszfix
 %endif
 %patch77 -p1 -b .gcc-swiftshader-visibility
-%patch78 -p1 -b .futex-time64
 %patch79 -p1 -b .widevine-no-download
 %patch80 -p1 -b .EnumTable-crash
 
@@ -732,6 +736,7 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 
 %if 0%{?rhel} == 8
 # %%patch107 -p1 -b .el8-arm-incompatible-ints
+%patch110 -p1 -b .el8-aarch64-libpng16-symbol-prefixes
 %endif
 
 # Feature specific patches
@@ -756,7 +761,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 
 # Additional patches:
 %patch700 -p1 -b .missing-std-vector
-%patch701 -p1 -b .ungoogled-chromium-fix
 
 # Change shebang in all relevant files in this directory and all subdirectories
 # See `man find` for how the `-exec command {} +` syntax works
@@ -962,6 +966,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/cros_system_api' \
 	'third_party/dav1d' \
 	'third_party/dawn' \
+	'third_party/dawn/third_party/khronos' \
 	'third_party/depot_tools' \
 	'third_party/devscripts' \
 	'third_party/devtools-frontend' \
@@ -1000,6 +1005,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/googletest' \
 	'third_party/grpc' \
 	'third_party/harfbuzz-ng' \
+	'third_party/highway' \
 	'third_party/hunspell' \
 	'third_party/iccjpeg' \
 	'third_party/icu' \
@@ -1021,6 +1027,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/libgifcodec' \
 	'third_party/libjingle' \
 	'third_party/libjpeg_turbo' \
+	'third_party/libjxl' \
 	'third_party/libphonenumber' \
 	'third_party/libpng' \
 	'third_party/libsecret' \
@@ -1094,7 +1101,6 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/rnnoise' \
 	'third_party/ruy' \
 	'third_party/s2cellid' \
-	'third_party/schema_org' \
 	'third_party/securemessage' \
 	'third_party/shell-encryption' \
 	'third_party/simplejson' \
@@ -1131,6 +1137,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/wayland' \
 	'third_party/web-animations-js' \
 	'third_party/webdriver' \
+	'third_party/webgpu-cts' \
 	'third_party/webrtc' \
 	'third_party/webrtc/common_audio/third_party/ooura' \
 	'third_party/webrtc/common_audio/third_party/spl_sqrt_floor' \
@@ -1521,6 +1528,10 @@ fi
 %lang(vi) %{chromium_path}/locales/vi.pak*
 %lang(zh_CN) %{chromium_path}/locales/zh-CN.pak*
 %lang(zh_TW) %{chromium_path}/locales/zh-TW.pak*
+# These are psuedolocales, not real ones.
+# So we just include them always.
+%{chromium_path}/locales/ar-XB.pak*
+%{chromium_path}/locales/en-XA.pak*
 
 %{_bindir}/chromedriver
 %{chromium_path}/chromedriver
@@ -1528,6 +1539,9 @@ fi
 %endif
 
 %changelog
+* Sun Jun  6 2021 wchen342 <feiyu2817@gmail.com> - 91.0.4472.77-1
+- update Chromium to 91.0.4472.77
+
 * Thu May 13 2021 wchen342 <feiyu2817@gmail.com> - 90.0.4430.212-1
 - update Chromium to 90.0.4430.212
 
