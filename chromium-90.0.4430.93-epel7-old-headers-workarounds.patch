@@ -1,10 +1,10 @@
 diff -up chromium-90.0.4430.85/mojo/core/channel_linux.cc.epel7-kcmp chromium-90.0.4430.85/mojo/core/channel_linux.cc
 --- chromium-90.0.4430.85/mojo/core/channel_linux.cc.epel7-kcmp	2021-04-27 11:42:46.207245608 -0400
 +++ chromium-90.0.4430.85/mojo/core/channel_linux.cc	2021-04-27 11:43:21.941841419 -0400
-@@ -37,6 +37,25 @@
+@@ -39,6 +39,24 @@
  #include "mojo/core/core.h"
  #include "mojo/core/embedder/features.h"
- 
+
 +#ifndef F_LINUX_SPECIFIC_BASE
 +#define F_LINUX_SPECIFIC_BASE 1024
 +#endif
@@ -23,10 +23,9 @@ diff -up chromium-90.0.4430.85/mojo/core/channel_linux.cc.epel7-kcmp chromium-90
 +#ifndef F_GET_SEALS
 +#define F_GET_SEALS (F_LINUX_SPECIFIC_BASE + 10)
 +#endif
-+
- namespace mojo {
- namespace core {
- 
+ #ifndef EFD_ZERO_ON_WAKE
+ #define EFD_ZERO_ON_WAKE O_NOFOLLOW
+ #endif
 diff -up chromium-90.0.4430.85/sandbox/policy/linux/bpf_cros_amd_gpu_policy_linux.cc.epel7-kcmp chromium-90.0.4430.85/sandbox/policy/linux/bpf_cros_amd_gpu_policy_linux.cc
 --- chromium-90.0.4430.85/sandbox/policy/linux/bpf_cros_amd_gpu_policy_linux.cc.epel7-kcmp	2021-04-20 14:58:36.000000000 -0400
 +++ chromium-90.0.4430.85/sandbox/policy/linux/bpf_cros_amd_gpu_policy_linux.cc	2021-04-26 11:13:36.743346891 -0400
