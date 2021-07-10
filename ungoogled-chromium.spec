@@ -5,12 +5,7 @@
 
 # This flag is so I can build things very fast on a giant system.
 # Do not enable in Koji builds.
-# Doesn't work on RHEL 7
-%if 0%{?rhel} == 7
 %global use_all_cpus 0
-%else
-%global use_all_cpus 1
-%endif
 
 %if %{use_all_cpus}
 %global numjobs %{_smp_build_ncpus}
@@ -127,7 +122,11 @@ BuildRequires:  libicu-devel >= 5.4
 %global gtk3 1
 
 %if 0%{?rhel} == 7 || 0%{?rhel} == 8
+%if 0%{?rhel} == 7
+%global dts_version 10
+%else
 %global dts_version 9
+%endif
 
 %global bundleopus 1
 %global bundlelibusbx 1
@@ -170,7 +169,7 @@ BuildRequires:  libicu-devel >= 5.4
 %global debug_pkg 0
 
 %global majorversion 91
-%global revision 1
+%global revision 2
 
 # Depot tools revision
 %global depot_tools_revision 1cabb17575917b73ec2e270d4187656c20b1ab0c
@@ -289,7 +288,7 @@ Patch108:	chromium-85.0.4183.83-el7-old-libdrm.patch
 # error: no matching function for call to 'std::basic_string<char>::erase(std::basic_string<char>::const_iterator, __gnu_cxx::__normal_iterator<const char*, std::basic_string<char> >&)'
 #   33 |   property_name.erase(property_name.cbegin(), cur);
 # Not sure how this EVER worked anywhere, but it only seems to fail on EPEL-7.
-Patch109:	chromium-90.0.4430.93-epel7-erase-fix.patch
+Patch109:	chromium-91.0.4472.114-epel7-erase-fix.patch
 # Again, not sure how epel8 is the only one to hit this...
 # AARCH64 neon symbols need to be prefixed too to prevent multiple definition issue at linktime
 Patch110:	chromium-90.0.4430.93-epel8-aarch64-libpng16-symbol-prefixes.patch
@@ -722,7 +721,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch77 -p1 -b .gcc-swiftshader-visibility
 %patch79 -p1 -b .widevine-no-download
 %patch80 -p1 -b .EnumTable-crash
-
 
 # EPEL specific patches
 %if 0%{?rhel} == 7
@@ -1539,6 +1537,9 @@ fi
 %endif
 
 %changelog
+* Sat Jul 10 2021 wchen342 <feiyu2817@gmail.com> - 91.0.4472.114-2
+- Fedora upstream update
+
 * Sat Jun 12 2021 wchen342 <feiyu2817@gmail.com> - 91.0.4472.114-1
 - update Chromium to 91.0.4472.114
 
