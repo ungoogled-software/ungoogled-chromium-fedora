@@ -179,7 +179,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4472.114
+Version:	%{majorversion}.0.4472.164
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -1537,6 +1537,9 @@ fi
 %endif
 
 %changelog
+* Fri Jul 16 2021 wchen342 <feiyu2817@gmail.com> - 91.0.4472.164-1
+- update Chromium to 91.0.4472.164
+
 * Sat Jul 10 2021 wchen342 <feiyu2817@gmail.com> - 91.0.4472.114-2
 - Fedora upstream update
 
