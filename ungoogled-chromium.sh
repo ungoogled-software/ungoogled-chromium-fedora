@@ -60,6 +60,8 @@ if [ -n "$XDG_CONFIG_HOME" ]; then
 elif [ -n "$HOME" ]; then
     USER_FLAGS_LOCATION="$HOME/.config/chromium-flags.conf"
 fi
-CHROMIUM_DISTRO_FLAGS+=`cat $USER_FLAGS_LOCATION`
+if [ -f $USER_FLAGS_LOCATION ]; then
+    CHROMIUM_DISTRO_FLAGS+=`cat $USER_FLAGS_LOCATION`
+fi
 
 exec -a "$0" "$HERE/@@CHROMIUM_BROWSER_CHANNEL@@" $CHROMIUM_DISTRO_FLAGS "$@"
