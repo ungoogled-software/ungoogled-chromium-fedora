@@ -53,4 +53,11 @@ CHROMIUM_DISTRO_FLAGS=" --enable-plugins \
                         --disallow-signin \
                         --auto-ssl-client-auth @@EXTRA_FLAGS@@"
 
+
+# Load user flags
+USER_FLAGS_LOCATION="$HOME/.config/chromium-flags.conf"
+if [ -f $USER_FLAGS_LOCATION ]; then
+    CHROMIUM_DISTRO_FLAGS+=`cat $USER_FLAGS_LOCATION`
+fi
+
 exec -a "$0" "$HERE/@@CHROMIUM_BROWSER_CHANNEL@@" $CHROMIUM_DISTRO_FLAGS "$@"
