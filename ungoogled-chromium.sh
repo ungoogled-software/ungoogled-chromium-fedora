@@ -61,7 +61,10 @@ elif [ -n "$HOME" ]; then
     USER_FLAGS_LOCATION="$HOME/.config/chromium-flags.conf"
 fi
 if [ -f $USER_FLAGS_LOCATION ]; then
-    CHROMIUM_DISTRO_FLAGS+=`cat $USER_FLAGS_LOCATION`
+    while read -r line; do
+    [[ "$line" =~ ^#.*$ ]] && continue
+      CHROMIUM_DISTRO_FLAGS+="$line "
+    done < "$USER_FLAGS_LOCATION"
 fi
 
 exec -a "$0" "$HERE/@@CHROMIUM_BROWSER_CHANNEL@@" $CHROMIUM_DISTRO_FLAGS "$@"
