@@ -1,0 +1,4199 @@
+diff -up chromium-92.0.4515.107/third_party/highway/src/CMakeLists.txt.in.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/CMakeLists.txt.in
+diff -up chromium-92.0.4515.107/third_party/highway/src/CMakeLists.txt.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/CMakeLists.txt
+--- chromium-92.0.4515.107/third_party/highway/src/CMakeLists.txt.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/CMakeLists.txt	2021-07-26 17:13:36.158002603 -0400
+@@ -19,7 +19,7 @@ if(POLICY CMP0083)
+   cmake_policy(SET CMP0083 NEW)
+ endif()
+ 
+-project(hwy VERSION 0.1)
++project(hwy VERSION 0.12.2)  # Keep in sync with highway.h version
+ 
+ set(CMAKE_CXX_STANDARD 11)
+ set(CMAKE_CXX_EXTENSIONS OFF)
+@@ -40,6 +40,8 @@ if (NOT CMAKE_BUILD_TYPE)
+   set(CMAKE_BUILD_TYPE RelWithDebInfo)
+ endif()
+ 
++set(HWY_CMAKE_ARM7 OFF CACHE BOOL "Set copts for ARMv7 with NEON?")
++
+ include(CheckCXXSourceCompiles)
+ check_cxx_source_compiles(
+    "int main() {
+@@ -51,10 +53,13 @@ check_cxx_source_compiles(
+   HWY_EMSCRIPTEN
+ )
+ 
++set(HWY_CONTRIB_SOURCES
++    hwy/contrib/image/image.cc
++    hwy/contrib/image/image.h
++    hwy/contrib/math/math-inl.h
++)
++
+ set(HWY_SOURCES
+-    contrib/image/image.cc
+-    contrib/image/image.h
+-    contrib/math/math-inl.h
+     hwy/aligned_allocator.cc
+     hwy/aligned_allocator.h
+     hwy/base.h
+@@ -64,6 +69,7 @@ set(HWY_SOURCES
+     hwy/nanobenchmark.cc
+     hwy/nanobenchmark.h
+     hwy/ops/arm_neon-inl.h
++    hwy/ops/arm_sve-inl.h
+     hwy/ops/scalar-inl.h
+     hwy/ops/set_macros-inl.h
+     hwy/ops/shared-inl.h
+@@ -146,13 +152,28 @@ else()
+       -fno-exceptions
+     )
+   endif()
+-endif()
++
++  if (HWY_CMAKE_ARM7)
++    list(APPEND HWY_FLAGS
++      -march=armv7-a
++      -mfpu=neon-vfpv4
++      -mfloat-abi=hard  # must match the toolchain specified as CXX=
++      -mfp16-format=ieee  # required for vcvt_f32_f16
++    )
++  endif()  # HWY_CMAKE_ARM7
++
++endif()  # !MSVC
+ 
+ add_library(hwy STATIC ${HWY_SOURCES})
+ target_compile_options(hwy PRIVATE ${HWY_FLAGS})
+ set_property(TARGET hwy PROPERTY POSITION_INDEPENDENT_CODE ON)
+ target_include_directories(hwy PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+ 
++add_library(hwy_contrib STATIC ${HWY_CONTRIB_SOURCES})
++target_compile_options(hwy_contrib PRIVATE ${HWY_FLAGS})
++set_property(TARGET hwy_contrib PROPERTY POSITION_INDEPENDENT_CODE ON)
++target_include_directories(hwy_contrib PUBLIC ${CMAKE_CURRENT_LIST_DIR})
++
+ # -------------------------------------------------------- install library
+ install(TARGETS hwy
+   DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+@@ -166,9 +187,21 @@ foreach (source ${HWY_SOURCES})
+   endif()
+ endforeach()
+ 
+-# Add a pkg-config file for libhwy and the test library.
++install(TARGETS hwy_contrib
++  DESTINATION "${CMAKE_INSTALL_LIBDIR}")
++# Install all the headers keeping the relative path to the current directory
++# when installing them.
++foreach (source ${HWY_CONTRIB_SOURCES})
++  if ("${source}" MATCHES "\.h$")
++    get_filename_component(dirname "${source}" DIRECTORY)
++    install(FILES "${source}"
++        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${dirname}")
++  endif()
++endforeach()
++
++# Add a pkg-config file for libhwy and the contrib/test libraries.
+ set(HWY_LIBRARY_VERSION "${CMAKE_PROJECT_VERSION}")
+-foreach (pc libhwy.pc libhwy-test.pc)
++foreach (pc libhwy.pc libhwy-contrib.pc libhwy-test.pc)
+   configure_file("${CMAKE_CURRENT_SOURCE_DIR}/${pc}.in" "${pc}" @ONLY)
+   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${pc}"
+       DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+@@ -251,8 +284,8 @@ endif()
+ endif() # HWY_SYSTEM_GTEST
+ 
+ set(HWY_TEST_FILES
+-  contrib/image/image_test.cc
+-  # contrib/math/math_test.cc
++  hwy/contrib/image/image_test.cc
++  # hwy/contrib/math/math_test.cc
+   hwy/aligned_allocator_test.cc
+   hwy/base_test.cc
+   hwy/highway_test.cc
+@@ -274,11 +307,16 @@ foreach (TESTFILE IN LISTS HWY_TEST_FILE
+   get_filename_component(TESTNAME ${TESTFILE} NAME_WE)
+   add_executable(${TESTNAME} ${TESTFILE})
+   target_compile_options(${TESTNAME} PRIVATE ${HWY_FLAGS})
++  # Test all targets, not just the best/baseline. This changes the default
++  # policy to all-attainable; note that setting -DHWY_COMPILE_* directly can
++  # cause compile errors because only one may be set, and other CMakeLists.txt
++  # that include us may set them.
++  target_compile_options(${TESTNAME} PRIVATE -DHWY_IS_TEST=1)
+ 
+   if(HWY_SYSTEM_GTEST)
+-    target_link_libraries(${TESTNAME} hwy GTest::GTest GTest::Main)
++    target_link_libraries(${TESTNAME} hwy hwy_contrib GTest::GTest GTest::Main)
+   else()
+-    target_link_libraries(${TESTNAME} hwy gtest gtest_main)
++    target_link_libraries(${TESTNAME} hwy hwy_contrib gtest gtest_main)
+   endif()
+   # Output test targets in the test directory.
+   set_target_properties(${TESTNAME} PROPERTIES PREFIX "tests/")
+diff -up chromium-92.0.4515.107/third_party/highway/src/debian/changelog.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/debian/changelog
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/aligned_allocator.h.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/aligned_allocator.h
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/aligned_allocator.h.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/aligned_allocator.h	2021-07-26 17:15:37.281847484 -0400
+@@ -111,6 +111,32 @@ AlignedUniquePtr<T> MakeUniqueAligned(Ar
+       new (ptr) T(std::forward<Args>(args)...), AlignedDeleter());
+ }
+ 
++// Helpers for array allocators (avoids overflow)
++namespace detail {
++
++// Returns x such that 1u << x == n (if n is a power of two).
++static inline constexpr size_t ShiftCount(size_t n) {
++  return (n <= 1) ? 0 : 1 + ShiftCount(n / 2);
++}
++
++template <typename T>
++T* AllocateAlignedItems(size_t items, AllocPtr alloc_ptr, void* opaque_ptr) {
++  constexpr size_t size = sizeof(T);
++
++  constexpr bool is_pow2 = (size & (size - 1)) == 0;
++  constexpr size_t bits = ShiftCount(size);
++  static_assert(!is_pow2 || (1ull << bits) == size, "ShiftCount is incorrect");
++
++  const size_t bytes = is_pow2 ? items << bits : items * size;
++  const size_t check = is_pow2 ? bytes >> bits : bytes / size;
++  if (check != items) {
++    return nullptr;  // overflowed
++  }
++  return static_cast<T*>(AllocateAlignedBytes(bytes, alloc_ptr, opaque_ptr));
++}
++
++}  // namespace detail
++
+ // Aligned memory equivalent of make_unique<T[]> for array types using the
+ // custom allocators alloc/free. This function calls the constructor with the
+ // passed Args... on every created item. The destructor of each element will be
+@@ -118,10 +144,11 @@ AlignedUniquePtr<T> MakeUniqueAligned(Ar
+ template <typename T, typename... Args>
+ AlignedUniquePtr<T[]> MakeUniqueAlignedArrayWithAlloc(
+     size_t items, AllocPtr alloc, FreePtr free, void* opaque, Args&&... args) {
+-  T* ptr =
+-      static_cast<T*>(AllocateAlignedBytes(items * sizeof(T), alloc, opaque));
+-  for (size_t i = 0; i < items; i++) {
+-    new (ptr + i) T(std::forward<Args>(args)...);
++  T* ptr = detail::AllocateAlignedItems<T>(items, alloc, opaque);
++  if (ptr != nullptr) {
++    for (size_t i = 0; i < items; i++) {
++      new (ptr + i) T(std::forward<Args>(args)...);
++    }
+   }
+   return AlignedUniquePtr<T[]>(ptr, AlignedDeleter(free, opaque));
+ }
+@@ -165,7 +192,7 @@ template <typename T>
+ AlignedFreeUniquePtr<T[]> AllocateAligned(const size_t items, AllocPtr alloc,
+                                           FreePtr free, void* opaque) {
+   return AlignedFreeUniquePtr<T[]>(
+-      static_cast<T*>(AllocateAlignedBytes(items * sizeof(T), alloc, opaque)),
++      detail::AllocateAlignedItems<T>(items, alloc, opaque),
+       AlignedFreer(free, opaque));
+ }
+ 
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/aligned_allocator_test.cc.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/aligned_allocator_test.cc
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/aligned_allocator_test.cc.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/aligned_allocator_test.cc	2021-07-26 17:16:43.672858709 -0400
+@@ -16,6 +16,7 @@
+ 
+ #include <stddef.h>
+ 
++#include <array>
+ #include <new>
+ #include <random>
+ #include <vector>
+@@ -87,6 +88,32 @@ TEST(AlignedAllocatorTest, FreeNullptr)
+                    /*opaque_ptr=*/nullptr);
+ }
+ 
++TEST(AlignedAllocatorTest, Log2) {
++  EXPECT_EQ(0u, detail::ShiftCount(1));
++  EXPECT_EQ(1u, detail::ShiftCount(2));
++  EXPECT_EQ(3u, detail::ShiftCount(8));
++}
++
++// Allocator returns null when it detects overflow of items * sizeof(T).
++TEST(AlignedAllocatorTest, Overflow) {
++  constexpr size_t max = ~size_t(0);
++  constexpr size_t msb = (max >> 1) + 1;
++  using Size5 = std::array<uint8_t, 5>;
++  using Size10 = std::array<uint8_t, 10>;
++  EXPECT_EQ(nullptr,
++            detail::AllocateAlignedItems<uint32_t>(max / 2, nullptr, nullptr));
++  EXPECT_EQ(nullptr,
++            detail::AllocateAlignedItems<uint32_t>(max / 3, nullptr, nullptr));
++  EXPECT_EQ(nullptr,
++            detail::AllocateAlignedItems<Size5>(max / 4, nullptr, nullptr));
++  EXPECT_EQ(nullptr,
++            detail::AllocateAlignedItems<uint16_t>(msb, nullptr, nullptr));
++  EXPECT_EQ(nullptr,
++            detail::AllocateAlignedItems<double>(msb + 1, nullptr, nullptr));
++  EXPECT_EQ(nullptr,
++            detail::AllocateAlignedItems<Size10>(msb / 4, nullptr, nullptr));
++}
++
+ TEST(AlignedAllocatorTest, AllocDefaultPointers) {
+   const size_t kSize = 7777;
+   void* ptr = AllocateAlignedBytes(kSize, /*alloc_ptr=*/nullptr,
+@@ -215,7 +242,8 @@ TEST(AlignedAllocatorTest, MakeUniqueAli
+     auto arr = MakeUniqueAlignedArrayWithAlloc<SampleObject<24>>(
+         7, FakeAllocator::StaticAlloc, FakeAllocator::StaticFree, &fake_alloc,
+         &counter);
+-    // An array shold still only call a single allocation.
++    ASSERT_NE(nullptr, arr.get());
++    // An array should still only call a single allocation.
+     EXPECT_EQ(1u, fake_alloc.PendingAllocs());
+     EXPECT_EQ(7, counter);
+     for (size_t i = 0; i < 7; i++) {
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/base.h.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/base.h
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/base.h.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/base.h	2021-07-26 17:16:04.753265910 -0400
+@@ -203,6 +203,10 @@
+ #define HWY_ARCH_X86_64 0
+ #endif
+ 
++#if HWY_ARCH_X86_32 && HWY_ARCH_X86_64
++#error "Cannot have both x86-32 and x86-64"
++#endif
++
+ #if HWY_ARCH_X86_32 || HWY_ARCH_X86_64
+ #define HWY_ARCH_X86 1
+ #else
+@@ -249,9 +253,11 @@
+ #define HWY_ARCH_RVV 0
+ #endif
+ 
++// It is an error to detect multiple architectures at the same time, but OK to
++// detect none of the above.
+ #if (HWY_ARCH_X86 + HWY_ARCH_PPC + HWY_ARCH_ARM + HWY_ARCH_WASM + \
+-     HWY_ARCH_RVV) != 1
+-#error "Must detect exactly one platform"
++     HWY_ARCH_RVV) > 1
++#error "Must not detect more than one architecture"
+ #endif
+ 
+ //------------------------------------------------------------------------------
+@@ -328,6 +334,12 @@ static constexpr HWY_MAYBE_UNUSED size_t
+ 
+ // RVV already has a builtin type and the GCC intrinsics require it.
+ #if HWY_ARCH_RVV && HWY_COMPILER_GCC
++#define HWY_NATIVE_FLOAT16 1
++#else
++#define HWY_NATIVE_FLOAT16 0
++#endif
++
++#if HWY_NATIVE_FLOAT16
+ using float16_t = __fp16;
+ // Clang does not allow __fp16 arguments, but scalar.h requires LaneType
+ // arguments, so use a wrapper.
+@@ -597,7 +609,7 @@ HWY_API size_t PopCount(uint64_t x) {
+   return static_cast<size_t>(__builtin_popcountll(x));
+ #elif HWY_COMPILER_MSVC && HWY_ARCH_X86_64
+   return _mm_popcnt_u64(x);
+-#elif HWY_COMPILER_MSVC
++#elif HWY_COMPILER_MSVC && HWY_ARCH_X86_32
+   return _mm_popcnt_u32(uint32_t(x)) + _mm_popcnt_u32(uint32_t(x >> 32));
+ #else
+   x -= ((x >> 1) & 0x55555555U);
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/cache_control.h.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/cache_control.h
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/cache_control.h.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/cache_control.h	2021-07-26 17:16:26.004589594 -0400
+@@ -32,6 +32,14 @@
+ #include <emmintrin.h>  // SSE2
+ #endif
+ 
++// Windows.h #defines these, which causes infinite recursion. Temporarily
++// undefine them in this header; these functions are anyway deprecated.
++// TODO(janwas): remove when these functions are removed.
++#pragma push_macro("LoadFence")
++#pragma push_macro("StoreFence")
++#undef LoadFence
++#undef StoreFence
++
+ namespace hwy {
+ 
+ // Even if N*sizeof(T) is smaller, Stream may write a multiple of this size.
+@@ -83,6 +91,17 @@ HWY_INLINE HWY_ATTR_CACHE void FlushCach
+ #endif
+ }
+ 
++// Reduces power consumption in spin-loops. No effect on non-x86.
++HWY_INLINE HWY_ATTR_CACHE void Pause() {
++#if HWY_ARCH_X86 && !defined(HWY_DISABLE_CACHE_CONTROL)
++  _mm_pause();
++#endif
++}
++
+ }  // namespace hwy
+ 
++// TODO(janwas): remove when these functions are removed. (See above.)
++#pragma pop_macro("StoreFence")
++#pragma pop_macro("LoadFence")
++
+ #endif  // HIGHWAY_HWY_CACHE_CONTROL_H_
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/examples/skeleton.cc.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/examples/skeleton.cc
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/examples/skeleton_test.cc.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/examples/skeleton_test.cc
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/highway.h.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/highway.h
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/highway.h.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/highway.h	2021-07-26 17:16:58.109078590 -0400
+@@ -25,10 +25,10 @@
+ 
+ namespace hwy {
+ 
+-// API version (https://semver.org/)
++// API version (https://semver.org/); keep in sync with CMakeLists.txt.
+ #define HWY_MAJOR 0
+ #define HWY_MINOR 12
+-#define HWY_PATCH 0
++#define HWY_PATCH 2
+ 
+ //------------------------------------------------------------------------------
+ // Shorthand for descriptors (defined in shared-inl.h) used to select overloads.
+@@ -49,7 +49,7 @@ namespace hwy {
+   HWY_FULL_RECOMPOSER((__VA_ARGS__, HWY_FULL2, HWY_FULL1, ))
+ #define HWY_FULL(...) HWY_CHOOSE_FULL(__VA_ARGS__())(__VA_ARGS__)
+ 
+-// Vector of up to MAX_N lanes.
++// Vector of up to MAX_N lanes. Discouraged, when possible, use Half<> instead.
+ #define HWY_CAPPED(T, MAX_N) \
+   hwy::HWY_NAMESPACE::Simd<T, HWY_MIN(MAX_N, HWY_LANES(T))>
+ 
+@@ -75,6 +75,10 @@ namespace hwy {
+ #define HWY_STATIC_DISPATCH(FUNC_NAME) N_WASM::FUNC_NAME
+ #elif HWY_STATIC_TARGET == HWY_NEON
+ #define HWY_STATIC_DISPATCH(FUNC_NAME) N_NEON::FUNC_NAME
++#elif HWY_STATIC_TARGET == HWY_SVE
++#define HWY_STATIC_DISPATCH(FUNC_NAME) N_SVE::FUNC_NAME
++#elif HWY_STATIC_TARGET == HWY_SVE2
++#define HWY_STATIC_DISPATCH(FUNC_NAME) N_SVE2::FUNC_NAME
+ #elif HWY_STATIC_TARGET == HWY_PPC8
+ #define HWY_STATIC_DISPATCH(FUNC_NAME) N_PPC8::FUNC_NAME
+ #elif HWY_STATIC_TARGET == HWY_SSE4
+@@ -143,6 +147,18 @@ FunctionCache<RetType, Args...> Function
+ #define HWY_CHOOSE_NEON(FUNC_NAME) nullptr
+ #endif
+ 
++#if HWY_TARGETS & HWY_SVE
++#define HWY_CHOOSE_SVE(FUNC_NAME) &N_SVE::FUNC_NAME
++#else
++#define HWY_CHOOSE_SVE(FUNC_NAME) nullptr
++#endif
++
++#if HWY_TARGETS & HWY_SVE2
++#define HWY_CHOOSE_SVE2(FUNC_NAME) &N_SVE2::FUNC_NAME
++#else
++#define HWY_CHOOSE_SVE2(FUNC_NAME) nullptr
++#endif
++
+ #if HWY_TARGETS & HWY_PPC8
+ #define HWY_CHOOSE_PCC8(FUNC_NAME) &N_PPC8::FUNC_NAME
+ #else
+@@ -261,8 +277,11 @@ FunctionCache<RetType, Args...> Function
+ #elif HWY_TARGET == HWY_AVX3
+ #include "hwy/ops/x86_512-inl.h"
+ #elif HWY_TARGET == HWY_PPC8
++#error "PPC is not yet supported"
+ #elif HWY_TARGET == HWY_NEON
+ #include "hwy/ops/arm_neon-inl.h"
++#elif HWY_TARGET == HWY_SVE || HWY_TARGET == HWY_SVE2
++#include "hwy/ops/arm_sve-inl.h"
+ #elif HWY_TARGET == HWY_WASM
+ #include "hwy/ops/wasm_128-inl.h"
+ #elif HWY_TARGET == HWY_RVV
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark.cc.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark.cc
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark.cc.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark.cc	2021-07-26 17:17:12.094291603 -0400
+@@ -29,6 +29,22 @@
+ #include <string>
+ #include <vector>
+ 
++#if defined(_WIN32) || defined(_WIN64)
++#ifndef NOMINMAX
++#define NOMINMAX
++#endif  // NOMINMAX
++#include <windows.h>
++#endif
++
++#if defined(__MACH__)
++#include <mach/mach.h>
++#include <mach/mach_time.h>
++#endif
++
++#if defined(__HAIKU__)
++#include <OS.h>
++#endif
++
+ #include "hwy/base.h"
+ #if HWY_ARCH_PPC
+ #include <sys/platform/ppc.h>  // NOLINT __ppc_get_timebase_freq
+@@ -43,114 +59,13 @@
+ #endif  // HWY_ARCH_X86
+ 
+ namespace hwy {
+-namespace platform {
+ namespace {
+-
+-#if HWY_ARCH_X86
+-
+-void Cpuid(const uint32_t level, const uint32_t count,
+-           uint32_t* HWY_RESTRICT abcd) {
+-#if HWY_COMPILER_MSVC
+-  int regs[4];
+-  __cpuidex(regs, level, count);
+-  for (int i = 0; i < 4; ++i) {
+-    abcd[i] = regs[i];
+-  }
+-#else
+-  uint32_t a;
+-  uint32_t b;
+-  uint32_t c;
+-  uint32_t d;
+-  __cpuid_count(level, count, a, b, c, d);
+-  abcd[0] = a;
+-  abcd[1] = b;
+-  abcd[2] = c;
+-  abcd[3] = d;
+-#endif
+-}
+-
+-std::string BrandString() {
+-  char brand_string[49];
+-  std::array<uint32_t, 4> abcd;
+-
+-  // Check if brand string is supported (it is on all reasonable Intel/AMD)
+-  Cpuid(0x80000000U, 0, abcd.data());
+-  if (abcd[0] < 0x80000004U) {
+-    return std::string();
+-  }
+-
+-  for (size_t i = 0; i < 3; ++i) {
+-    Cpuid(static_cast<uint32_t>(0x80000002U + i), 0, abcd.data());
+-    memcpy(brand_string + i * 16, abcd.data(), sizeof(abcd));
+-  }
+-  brand_string[48] = 0;
+-  return brand_string;
+-}
+-
+-// Returns the frequency quoted inside the brand string. This does not
+-// account for throttling nor Turbo Boost.
+-double NominalClockRate() {
+-  const std::string& brand_string = BrandString();
+-  // Brand strings include the maximum configured frequency. These prefixes are
+-  // defined by Intel CPUID documentation.
+-  const char* prefixes[3] = {"MHz", "GHz", "THz"};
+-  const double multipliers[3] = {1E6, 1E9, 1E12};
+-  for (size_t i = 0; i < 3; ++i) {
+-    const size_t pos_prefix = brand_string.find(prefixes[i]);
+-    if (pos_prefix != std::string::npos) {
+-      const size_t pos_space = brand_string.rfind(' ', pos_prefix - 1);
+-      if (pos_space != std::string::npos) {
+-        const std::string digits =
+-            brand_string.substr(pos_space + 1, pos_prefix - pos_space - 1);
+-        return std::stod(digits) * multipliers[i];
+-      }
+-    }
+-  }
+-
+-  return 0.0;
+-}
+-
+-#endif  // HWY_ARCH_X86
+-
+-}  // namespace
+-
+-// Returns tick rate. Invariant means the tick counter frequency is independent
+-// of CPU throttling or sleep. May be expensive, caller should cache the result.
+-double InvariantTicksPerSecond() {
+-#if HWY_ARCH_PPC
+-  return __ppc_get_timebase_freq();
+-#elif HWY_ARCH_X86
+-  // We assume the TSC is invariant; it is on all recent Intel/AMD CPUs.
+-  return NominalClockRate();
+-#else
+-  // Fall back to clock_gettime nanoseconds.
+-  return 1E9;
+-#endif
+-}
+-
+-}  // namespace platform
+-namespace {
+-
+-// Prevents the compiler from eliding the computations that led to "output".
+-template <class T>
+-inline void PreventElision(T&& output) {
+-#if HWY_COMPILER_MSVC == 0
+-  // Works by indicating to the compiler that "output" is being read and
+-  // modified. The +r constraint avoids unnecessary writes to memory, but only
+-  // works for built-in types (typically FuncOutput).
+-  asm volatile("" : "+r"(output) : : "memory");
+-#else
+-  // MSVC does not support inline assembly anymore (and never supported GCC's
+-  // RTL constraints). Self-assignment with #pragma optimize("off") might be
+-  // expected to prevent elision, but it does not with MSVC 2015. Type-punning
+-  // with volatile pointers generates inefficient code on MSVC 2017.
+-  static std::atomic<T> dummy(T{});
+-  dummy.store(output, std::memory_order_relaxed);
+-#endif
+-}
+-
+ namespace timer {
+ 
++// Ticks := platform-specific timer values (CPU cycles on x86). Must be
++// unsigned to guarantee wraparound on overflow.
++using Ticks = uint64_t;
++
+ // Start/Stop return absolute timestamps and must be placed immediately before
+ // and after the region to measure. We provide separate Start/Stop functions
+ // because they use different fences.
+@@ -202,8 +117,8 @@ namespace timer {
+ 
+ // Returns a 64-bit timestamp in unit of 'ticks'; to convert to seconds,
+ // divide by InvariantTicksPerSecond.
+-inline uint64_t Start64() {
+-  uint64_t t;
++inline Ticks Start() {
++  Ticks t;
+ #if HWY_ARCH_PPC
+   asm volatile("mfspr %0, %1" : "=r"(t) : "i"(268));
+ #elif HWY_ARCH_X86 && HWY_COMPILER_MSVC
+@@ -228,8 +143,15 @@ inline uint64_t Start64() {
+       : "rdx", "memory", "cc");
+ #elif HWY_ARCH_RVV
+   asm volatile("rdcycle %0" : "=r"(t));
+-#else
+-  // Fall back to OS - unsure how to reliably query cntvct_el0 frequency.
++#elif defined(_WIN32) || defined(_WIN64)
++  LARGE_INTEGER counter;
++  (void)QueryPerformanceCounter(&counter);
++  t = counter.QuadPart;
++#elif defined(__MACH__)
++  t = mach_absolute_time();
++#elif defined(__HAIKU__)
++  t = system_time_nsecs();  // since boot
++#else  // POSIX
+   timespec ts;
+   clock_gettime(CLOCK_MONOTONIC, &ts);
+   t = ts.tv_sec * 1000000000LL + ts.tv_nsec;
+@@ -237,7 +159,7 @@ inline uint64_t Start64() {
+   return t;
+ }
+ 
+-inline uint64_t Stop64() {
++inline Ticks Stop() {
+   uint64_t t;
+ #if HWY_ARCH_PPC
+   asm volatile("mfspr %0, %1" : "=r"(t) : "i"(268));
+@@ -261,61 +183,7 @@ inline uint64_t Stop64() {
+       // "cc" = flags modified by SHL.
+       : "rcx", "rdx", "memory", "cc");
+ #else
+-  t = Start64();
+-#endif
+-  return t;
+-}
+-
+-// Returns a 32-bit timestamp with about 4 cycles less overhead than
+-// Start64. Only suitable for measuring very short regions because the
+-// timestamp overflows about once a second.
+-inline uint32_t Start32() {
+-  uint32_t t;
+-#if HWY_ARCH_X86 && HWY_COMPILER_MSVC
+-  _ReadWriteBarrier();
+-  _mm_lfence();
+-  _ReadWriteBarrier();
+-  t = static_cast<uint32_t>(__rdtsc());
+-  _ReadWriteBarrier();
+-  _mm_lfence();
+-  _ReadWriteBarrier();
+-#elif HWY_ARCH_X86_64
+-  asm volatile(
+-      "lfence\n\t"
+-      "rdtsc\n\t"
+-      "lfence"
+-      : "=a"(t)
+-      :
+-      // "memory" avoids reordering. rdx = TSC >> 32.
+-      : "rdx", "memory");
+-#elif HWY_ARCH_RVV
+-  asm volatile("rdcycle %0" : "=r"(t));
+-#else
+-  t = static_cast<uint32_t>(Start64());
+-#endif
+-  return t;
+-}
+-
+-inline uint32_t Stop32() {
+-  uint32_t t;
+-#if HWY_ARCH_X86 && HWY_COMPILER_MSVC
+-  _ReadWriteBarrier();
+-  unsigned aux;
+-  t = static_cast<uint32_t>(__rdtscp(&aux));
+-  _ReadWriteBarrier();
+-  _mm_lfence();
+-  _ReadWriteBarrier();
+-#elif HWY_ARCH_X86_64
+-  // Use inline asm because __rdtscp generates code to store TSC_AUX (ecx).
+-  asm volatile(
+-      "rdtscp\n\t"
+-      "lfence"
+-      : "=a"(t)
+-      :
+-      // "memory" avoids reordering. rcx = TSC_AUX. rdx = TSC >> 32.
+-      : "rcx", "rdx", "memory");
+-#else
+-  t = static_cast<uint32_t>(Stop64());
++  t = Start();
+ #endif
+   return t;
+ }
+@@ -440,21 +308,130 @@ T MedianAbsoluteDeviation(const T* value
+ }
+ 
+ }  // namespace robust_statistics
++}  // namespace
++namespace platform {
++namespace {
+ 
+-// Ticks := platform-specific timer values (CPU cycles on x86). Must be
+-// unsigned to guarantee wraparound on overflow. 32 bit timers are faster to
+-// read than 64 bit.
+-using Ticks = uint32_t;
++// Prevents the compiler from eliding the computations that led to "output".
++template <class T>
++inline void PreventElision(T&& output) {
++#if HWY_COMPILER_MSVC == 0
++  // Works by indicating to the compiler that "output" is being read and
++  // modified. The +r constraint avoids unnecessary writes to memory, but only
++  // works for built-in types (typically FuncOutput).
++  asm volatile("" : "+r"(output) : : "memory");
++#else
++  // MSVC does not support inline assembly anymore (and never supported GCC's
++  // RTL constraints). Self-assignment with #pragma optimize("off") might be
++  // expected to prevent elision, but it does not with MSVC 2015. Type-punning
++  // with volatile pointers generates inefficient code on MSVC 2017.
++  static std::atomic<T> dummy(T{});
++  dummy.store(output, std::memory_order_relaxed);
++#endif
++}
++
++#if HWY_ARCH_X86
++
++void Cpuid(const uint32_t level, const uint32_t count,
++           uint32_t* HWY_RESTRICT abcd) {
++#if HWY_COMPILER_MSVC
++  int regs[4];
++  __cpuidex(regs, level, count);
++  for (int i = 0; i < 4; ++i) {
++    abcd[i] = regs[i];
++  }
++#else
++  uint32_t a;
++  uint32_t b;
++  uint32_t c;
++  uint32_t d;
++  __cpuid_count(level, count, a, b, c, d);
++  abcd[0] = a;
++  abcd[1] = b;
++  abcd[2] = c;
++  abcd[3] = d;
++#endif
++}
++
++std::string BrandString() {
++  char brand_string[49];
++  std::array<uint32_t, 4> abcd;
++
++  // Check if brand string is supported (it is on all reasonable Intel/AMD)
++  Cpuid(0x80000000U, 0, abcd.data());
++  if (abcd[0] < 0x80000004U) {
++    return std::string();
++  }
++
++  for (size_t i = 0; i < 3; ++i) {
++    Cpuid(static_cast<uint32_t>(0x80000002U + i), 0, abcd.data());
++    memcpy(brand_string + i * 16, abcd.data(), sizeof(abcd));
++  }
++  brand_string[48] = 0;
++  return brand_string;
++}
++
++// Returns the frequency quoted inside the brand string. This does not
++// account for throttling nor Turbo Boost.
++double NominalClockRate() {
++  const std::string& brand_string = BrandString();
++  // Brand strings include the maximum configured frequency. These prefixes are
++  // defined by Intel CPUID documentation.
++  const char* prefixes[3] = {"MHz", "GHz", "THz"};
++  const double multipliers[3] = {1E6, 1E9, 1E12};
++  for (size_t i = 0; i < 3; ++i) {
++    const size_t pos_prefix = brand_string.find(prefixes[i]);
++    if (pos_prefix != std::string::npos) {
++      const size_t pos_space = brand_string.rfind(' ', pos_prefix - 1);
++      if (pos_space != std::string::npos) {
++        const std::string digits =
++            brand_string.substr(pos_space + 1, pos_prefix - pos_space - 1);
++        return std::stod(digits) * multipliers[i];
++      }
++    }
++  }
++
++  return 0.0;
++}
++
++#endif  // HWY_ARCH_X86
++
++}  // namespace
++
++double InvariantTicksPerSecond() {
++#if HWY_ARCH_PPC
++  return __ppc_get_timebase_freq();
++#elif HWY_ARCH_X86
++  // We assume the TSC is invariant; it is on all recent Intel/AMD CPUs.
++  return NominalClockRate();
++#elif defined(_WIN32) || defined(_WIN64)
++  LARGE_INTEGER freq;
++  (void)QueryPerformanceFrequency(&freq);
++  return double(freq.QuadPart);
++#elif defined(__MACH__)
++  // https://developer.apple.com/library/mac/qa/qa1398/_index.html
++  mach_timebase_info_data_t timebase;
++  (void)mach_timebase_info(&timebase);
++  return double(timebase.denom) / timebase.numer * 1E9;
++#else
++  // TODO(janwas): ARM? Unclear how to reliably query cntvct_el0 frequency.
++  return 1E9;  // Haiku and clock_gettime return nanoseconds.
++#endif
++}
+ 
+-// Returns timer overhead / minimum measurable difference.
+-Ticks TimerResolution() {
++double Now() {
++  static const double mul = 1.0 / InvariantTicksPerSecond();
++  return static_cast<double>(timer::Start()) * mul;
++}
++
++uint64_t TimerResolution() {
+   // Nested loop avoids exceeding stack/L1 capacity.
+-  Ticks repetitions[Params::kTimerSamples];
++  timer::Ticks repetitions[Params::kTimerSamples];
+   for (size_t rep = 0; rep < Params::kTimerSamples; ++rep) {
+-    Ticks samples[Params::kTimerSamples];
++    timer::Ticks samples[Params::kTimerSamples];
+     for (size_t i = 0; i < Params::kTimerSamples; ++i) {
+-      const Ticks t0 = timer::Start32();
+-      const Ticks t1 = timer::Stop32();
++      const timer::Ticks t0 = timer::Start();
++      const timer::Ticks t1 = timer::Stop();
+       samples[i] = t1 - t0;
+     }
+     repetitions[rep] = robust_statistics::Mode(samples);
+@@ -462,18 +439,21 @@ Ticks TimerResolution() {
+   return robust_statistics::Mode(repetitions);
+ }
+ 
+-static const Ticks timer_resolution = TimerResolution();
++}  // namespace platform
++namespace {
++
++static const timer::Ticks timer_resolution = platform::TimerResolution();
+ 
+ // Estimates the expected value of "lambda" values with a variable number of
+ // samples until the variability "rel_mad" is less than "max_rel_mad".
+ template <class Lambda>
+-Ticks SampleUntilStable(const double max_rel_mad, double* rel_mad,
+-                        const Params& p, const Lambda& lambda) {
++timer::Ticks SampleUntilStable(const double max_rel_mad, double* rel_mad,
++                               const Params& p, const Lambda& lambda) {
+   // Choose initial samples_per_eval based on a single estimated duration.
+-  Ticks t0 = timer::Start32();
++  timer::Ticks t0 = timer::Start();
+   lambda();
+-  Ticks t1 = timer::Stop32();
+-  Ticks est = t1 - t0;
++  timer::Ticks t1 = timer::Stop();
++  timer::Ticks est = t1 - t0;
+   static const double ticks_per_second = platform::InvariantTicksPerSecond();
+   const size_t ticks_per_eval =
+       static_cast<size_t>(ticks_per_second * p.seconds_per_eval);
+@@ -481,21 +461,21 @@ Ticks SampleUntilStable(const double max
+       est == 0 ? p.min_samples_per_eval : ticks_per_eval / est;
+   samples_per_eval = std::max(samples_per_eval, p.min_samples_per_eval);
+ 
+-  std::vector<Ticks> samples;
++  std::vector<timer::Ticks> samples;
+   samples.reserve(1 + samples_per_eval);
+   samples.push_back(est);
+ 
+   // Percentage is too strict for tiny differences, so also allow a small
+   // absolute "median absolute deviation".
+-  const Ticks max_abs_mad = (timer_resolution + 99) / 100;
++  const timer::Ticks max_abs_mad = (timer_resolution + 99) / 100;
+   *rel_mad = 0.0;  // ensure initialized
+ 
+   for (size_t eval = 0; eval < p.max_evals; ++eval, samples_per_eval *= 2) {
+     samples.reserve(samples.size() + samples_per_eval);
+     for (size_t i = 0; i < samples_per_eval; ++i) {
+-      t0 = timer::Start32();
++      t0 = timer::Start();
+       lambda();
+-      t1 = timer::Stop32();
++      t1 = timer::Stop();
+       samples.push_back(t1 - t0);
+     }
+ 
+@@ -508,14 +488,14 @@ Ticks SampleUntilStable(const double max
+     NANOBENCHMARK_CHECK(est != 0);
+ 
+     // Median absolute deviation (mad) is a robust measure of 'variability'.
+-    const Ticks abs_mad = robust_statistics::MedianAbsoluteDeviation(
++    const timer::Ticks abs_mad = robust_statistics::MedianAbsoluteDeviation(
+         samples.data(), samples.size(), est);
+-    *rel_mad = static_cast<double>(int(abs_mad)) / est;
++    *rel_mad = static_cast<double>(abs_mad) / static_cast<double>(est);
+ 
+     if (*rel_mad <= max_rel_mad || abs_mad <= max_abs_mad) {
+       if (p.verbose) {
+-        printf("%6zu samples => %5u (abs_mad=%4u, rel_mad=%4.2f%%)\n",
+-               samples.size(), est, abs_mad, *rel_mad * 100.0);
++        printf("%6zu samples => %5zu (abs_mad=%4zu, rel_mad=%4.2f%%)\n",
++               samples.size(), size_t(est), size_t(abs_mad), *rel_mad * 100.0);
+       }
+       return est;
+     }
+@@ -539,29 +519,17 @@ InputVec UniqueInputs(const FuncInput* i
+   return unique;
+ }
+ 
+-// Returns how often we need to call func for sufficient precision, or zero
+-// on failure (e.g. the elapsed time is too long for a 32-bit tick count).
++// Returns how often we need to call func for sufficient precision.
+ size_t NumSkip(const Func func, const uint8_t* arg, const InputVec& unique,
+                const Params& p) {
+   // Min elapsed ticks for any input.
+-  Ticks min_duration = ~0u;
++  timer::Ticks min_duration = ~timer::Ticks(0);
+ 
+   for (const FuncInput input : unique) {
+-    // Make sure a 32-bit timer is sufficient.
+-    const uint64_t t0 = timer::Start64();
+-    PreventElision(func(arg, input));
+-    const uint64_t t1 = timer::Stop64();
+-    const uint64_t elapsed = t1 - t0;
+-    if (elapsed >= (1ULL << 30)) {
+-      fprintf(stderr, "Measurement failed: need 64-bit timer for input=%zu\n",
+-              input);
+-      return 0;
+-    }
+-
+     double rel_mad;
+-    const Ticks total = SampleUntilStable(
++    const timer::Ticks total = SampleUntilStable(
+         p.target_rel_mad, &rel_mad, p,
+-        [func, arg, input]() { PreventElision(func(arg, input)); });
++        [func, arg, input]() { platform::PreventElision(func(arg, input)); });
+     min_duration = std::min(min_duration, total - timer_resolution);
+   }
+ 
+@@ -571,8 +539,8 @@ size_t NumSkip(const Func func, const ui
+   const size_t num_skip =
+       min_duration == 0 ? 0 : (max_skip + min_duration - 1) / min_duration;
+   if (p.verbose) {
+-    printf("res=%u max_skip=%zu min_dur=%u num_skip=%zu\n", timer_resolution,
+-           max_skip, min_duration, num_skip);
++    printf("res=%zu max_skip=%zu min_dur=%zu num_skip=%zu\n",
++           size_t(timer_resolution), max_skip, size_t(min_duration), num_skip);
+   }
+   return num_skip;
+ }
+@@ -637,13 +605,14 @@ void FillSubset(const InputVec& full, co
+ }
+ 
+ // Returns total ticks elapsed for all inputs.
+-Ticks TotalDuration(const Func func, const uint8_t* arg, const InputVec* inputs,
+-                    const Params& p, double* max_rel_mad) {
++timer::Ticks TotalDuration(const Func func, const uint8_t* arg,
++                           const InputVec* inputs, const Params& p,
++                           double* max_rel_mad) {
+   double rel_mad;
+-  const Ticks duration =
++  const timer::Ticks duration =
+       SampleUntilStable(p.target_rel_mad, &rel_mad, p, [func, arg, inputs]() {
+         for (const FuncInput input : *inputs) {
+-          PreventElision(func(arg, input));
++          platform::PreventElision(func(arg, input));
+         }
+       });
+   *max_rel_mad = std::max(*max_rel_mad, rel_mad);
+@@ -657,19 +626,20 @@ HWY_NOINLINE FuncOutput EmptyFunc(const
+ 
+ // Returns overhead of accessing inputs[] and calling a function; this will
+ // be deducted from future TotalDuration return values.
+-Ticks Overhead(const uint8_t* arg, const InputVec* inputs, const Params& p) {
++timer::Ticks Overhead(const uint8_t* arg, const InputVec* inputs,
++                      const Params& p) {
+   double rel_mad;
+   // Zero tolerance because repeatability is crucial and EmptyFunc is fast.
+   return SampleUntilStable(0.0, &rel_mad, p, [arg, inputs]() {
+     for (const FuncInput input : *inputs) {
+-      PreventElision(EmptyFunc(arg, input));
++      platform::PreventElision(EmptyFunc(arg, input));
+     }
+   });
+ }
+ 
+ }  // namespace
+ 
+-int Unpredictable1() { return timer::Start64() != ~0ULL; }
++int Unpredictable1() { return timer::Start() != ~0ULL; }
+ 
+ size_t Measure(const Func func, const uint8_t* arg, const FuncInput* inputs,
+                const size_t num_inputs, Result* results, const Params& p) {
+@@ -685,32 +655,35 @@ size_t Measure(const Func func, const ui
+       ReplicateInputs(inputs, num_inputs, unique.size(), num_skip, p);
+   InputVec subset(full.size() - num_skip);
+ 
+-  const Ticks overhead = Overhead(arg, &full, p);
+-  const Ticks overhead_skip = Overhead(arg, &subset, p);
++  const timer::Ticks overhead = Overhead(arg, &full, p);
++  const timer::Ticks overhead_skip = Overhead(arg, &subset, p);
+   if (overhead < overhead_skip) {
+-    fprintf(stderr, "Measurement failed: overhead %u < %u\n", overhead,
+-            overhead_skip);
++    fprintf(stderr, "Measurement failed: overhead %zu < %zu\n",
++            size_t(overhead), size_t(overhead_skip));
+     return 0;
+   }
+ 
+   if (p.verbose) {
+-    printf("#inputs=%5zu,%5zu overhead=%5u,%5u\n", full.size(), subset.size(),
+-           overhead, overhead_skip);
++    printf("#inputs=%5zu,%5zu overhead=%5zu,%5zu\n", full.size(), subset.size(),
++           size_t(overhead), size_t(overhead_skip));
+   }
+ 
+   double max_rel_mad = 0.0;
+-  const Ticks total = TotalDuration(func, arg, &full, p, &max_rel_mad);
++  const timer::Ticks total = TotalDuration(func, arg, &full, p, &max_rel_mad);
+ 
+   for (size_t i = 0; i < unique.size(); ++i) {
+     FillSubset(full, unique[i], num_skip, &subset);
+-    const Ticks total_skip = TotalDuration(func, arg, &subset, p, &max_rel_mad);
++    const timer::Ticks total_skip =
++        TotalDuration(func, arg, &subset, p, &max_rel_mad);
+ 
+     if (total < total_skip) {
+-      fprintf(stderr, "Measurement failed: total %u < %u\n", total, total_skip);
++      fprintf(stderr, "Measurement failed: total %zu < %zu\n", size_t(total),
++              size_t(total_skip));
+       return 0;
+     }
+ 
+-    const Ticks duration = (total - overhead) - (total_skip - overhead_skip);
++    const timer::Ticks duration =
++        (total - overhead) - (total_skip - overhead_skip);
+     results[i].input = unique[i];
+     results[i].ticks = static_cast<float>(duration) * mul;
+     results[i].variability = static_cast<float>(max_rel_mad);
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark.h.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark.h
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark.h.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark.h	2021-07-26 17:17:12.094291603 -0400
+@@ -44,11 +44,6 @@
+ // central tendency of the measurement samples with the "half sample mode",
+ // which is more robust to outliers and skewed data than the mean or median.
+ 
+-// WARNING if included from multiple translation units compiled with distinct
+-// flags: this header requires textual inclusion and a predefined NB_NAMESPACE
+-// macro that is unique to the current compile flags. We must also avoid
+-// standard library headers such as vector and functional that define functions.
+-
+ #include <stddef.h>
+ #include <stdint.h>
+ 
+@@ -79,6 +74,16 @@ namespace platform {
+ // This call may be expensive, callers should cache the result.
+ double InvariantTicksPerSecond();
+ 
++// Returns current timestamp [in seconds] relative to an unspecified origin.
++// Features: monotonic (no negative elapsed time), steady (unaffected by system
++// time changes), high-resolution (on the order of microseconds).
++double Now();
++
++// Returns ticks elapsed in back to back timer calls, i.e. a function of the
++// timer resolution (minimum measurable difference) and overhead.
++// This call is expensive, callers should cache the result.
++uint64_t TimerResolution();
++
+ }  // namespace platform
+ 
+ // Returns 1, but without the compiler knowing what the value is. This prevents
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark_test.cc.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark_test.cc
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark_test.cc.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/nanobenchmark_test.cc	2021-07-26 17:10:30.283171481 -0400
+@@ -15,11 +15,11 @@
+ #include "hwy/nanobenchmark.h"
+ 
+ #include <stdio.h>
+-#include <stdlib.h>  // strtol
+-#include <unistd.h>  // sleep
+ 
+ #include <random>
+ 
++#include "hwy/tests/test_util-inl.h"
++
+ namespace hwy {
+ namespace {
+ 
+@@ -31,6 +31,7 @@ FuncOutput Div(const void*, FuncInput in
+ 
+ template <size_t N>
+ void MeasureDiv(const FuncInput (&inputs)[N]) {
++  printf("Measuring integer division (output on final two lines)\n");
+   Result results[N];
+   Params params;
+   params.max_evals = 4;  // avoid test timeout
+@@ -66,39 +67,14 @@ void MeasureRandom(const FuncInput (&inp
+   }
+ }
+ 
+-template <size_t N>
+-void EnsureLongMeasurementFails(const FuncInput (&inputs)[N]) {
+-  printf("Expect a 'measurement failed' below:\n");
+-  Result results[N];
+-
+-  const size_t num_results = Measure(
+-      [](const void*, const FuncInput input) -> FuncOutput {
+-        // Loop until the sleep succeeds (not interrupted by signal). We assume
+-        // >= 512 MHz, so 2 seconds will exceed the 1 << 30 tick safety limit.
+-        while (sleep(2) != 0) {
+-        }
+-        return input;
+-      },
+-      nullptr, inputs, N, results);
+-  NANOBENCHMARK_CHECK(num_results == 0);
+-  (void)num_results;
+-}
+-
+-void RunAll(const int argc, char** /*argv*/) {
+-  // unpredictable == 1 but the compiler doesn't know that.
+-  const int unpredictable = argc != 999;
++TEST(NanobenchmarkTest, RunAll) {
++  const int unpredictable = Unpredictable1();  // == 1, unknown to compiler.
+   static const FuncInput inputs[] = {static_cast<FuncInput>(unpredictable) + 2,
+                                      static_cast<FuncInput>(unpredictable + 9)};
+ 
+   MeasureDiv(inputs);
+   MeasureRandom(inputs);
+-  EnsureLongMeasurementFails(inputs);
+ }
+ 
+ }  // namespace
+ }  // namespace hwy
+-
+-int main(int argc, char* argv[]) {
+-  hwy::RunAll(argc, argv);
+-  return 0;
+-}
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/ops/arm_neon-inl.h.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/ops/arm_neon-inl.h
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/ops/arm_neon-inl.h.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/ops/arm_neon-inl.h	2021-07-26 17:20:19.294142914 -0400
+@@ -26,6 +26,8 @@ HWY_BEFORE_NAMESPACE();
+ namespace hwy {
+ namespace HWY_NAMESPACE {
+ 
++namespace detail {  // for code folding and Raw128
++
+ // Macros used to define single and double function calls for multiple types
+ // for full and half vectors. These macros are undefined at the end of the file.
+ 
+@@ -437,12 +439,14 @@ struct Raw128<int8_t, 1> {
+   using type = int8x8_t;
+ };
+ 
++}  // namespace detail
++
+ template <typename T>
+ using Full128 = Simd<T, 16 / sizeof(T)>;
+ 
+ template <typename T, size_t N = 16 / sizeof(T)>
+ class Vec128 {
+-  using Raw = typename Raw128<T, N>::type;
++  using Raw = typename detail::Raw128<T, N>::type;
+ 
+  public:
+   HWY_INLINE Vec128() {}
+@@ -480,7 +484,8 @@ class Vec128 {
+ // FF..FF or 0, also for floating-point - see README.
+ template <typename T, size_t N = 16 / sizeof(T)>
+ class Mask128 {
+-  using Raw = typename Raw128<T, N>::type;
++  // ARM C Language Extensions return and expect unsigned type.
++  using Raw = typename detail::Raw128<MakeUnsigned<T>, N>::type;
+ 
+  public:
+   HWY_INLINE Mask128() {}
+@@ -664,15 +669,25 @@ template <typename T, size_t N>
+ HWY_INLINE Vec128<T, N> Undefined(Simd<T, N> /*d*/) {
+   HWY_DIAGNOSTICS(push)
+   HWY_DIAGNOSTICS_OFF(disable : 4701, ignored "-Wuninitialized")
+-  typename Raw128<T, N>::type a;
++  typename detail::Raw128<T, N>::type a;
+   return Vec128<T, N>(a);
+   HWY_DIAGNOSTICS(pop)
+ }
+ 
+-// ------------------------------ Extract lane
++// Returns a vector with lane i=[0, N) set to "first" + i.
++template <typename T, size_t N, typename T2>
++Vec128<T, N> Iota(const Simd<T, N> d, const T2 first) {
++  HWY_ALIGN T lanes[16 / sizeof(T)];
++  for (size_t i = 0; i < 16 / sizeof(T); ++i) {
++    lanes[i] = static_cast<T>(first + static_cast<T2>(i));
++  }
++  return Load(d, lanes);
++}
++
++// ------------------------------ GetLane
+ 
+ HWY_INLINE uint8_t GetLane(const Vec128<uint8_t, 16> v) {
+-  return vget_lane_u8(vget_low_u8(v.raw), 0);
++  return vgetq_lane_u8(v.raw, 0);
+ }
+ template <size_t N>
+ HWY_INLINE uint8_t GetLane(const Vec128<uint8_t, N> v) {
+@@ -680,7 +695,7 @@ HWY_INLINE uint8_t GetLane(const Vec128<
+ }
+ 
+ HWY_INLINE int8_t GetLane(const Vec128<int8_t, 16> v) {
+-  return vget_lane_s8(vget_low_s8(v.raw), 0);
++  return vgetq_lane_s8(v.raw, 0);
+ }
+ template <size_t N>
+ HWY_INLINE int8_t GetLane(const Vec128<int8_t, N> v) {
+@@ -688,7 +703,7 @@ HWY_INLINE int8_t GetLane(const Vec128<i
+ }
+ 
+ HWY_INLINE uint16_t GetLane(const Vec128<uint16_t, 8> v) {
+-  return vget_lane_u16(vget_low_u16(v.raw), 0);
++  return vgetq_lane_u16(v.raw, 0);
+ }
+ template <size_t N>
+ HWY_INLINE uint16_t GetLane(const Vec128<uint16_t, N> v) {
+@@ -696,7 +711,7 @@ HWY_INLINE uint16_t GetLane(const Vec128
+ }
+ 
+ HWY_INLINE int16_t GetLane(const Vec128<int16_t, 8> v) {
+-  return vget_lane_s16(vget_low_s16(v.raw), 0);
++  return vgetq_lane_s16(v.raw, 0);
+ }
+ template <size_t N>
+ HWY_INLINE int16_t GetLane(const Vec128<int16_t, N> v) {
+@@ -704,7 +719,7 @@ HWY_INLINE int16_t GetLane(const Vec128<
+ }
+ 
+ HWY_INLINE uint32_t GetLane(const Vec128<uint32_t, 4> v) {
+-  return vget_lane_u32(vget_low_u32(v.raw), 0);
++  return vgetq_lane_u32(v.raw, 0);
+ }
+ template <size_t N>
+ HWY_INLINE uint32_t GetLane(const Vec128<uint32_t, N> v) {
+@@ -712,7 +727,7 @@ HWY_INLINE uint32_t GetLane(const Vec128
+ }
+ 
+ HWY_INLINE int32_t GetLane(const Vec128<int32_t, 4> v) {
+-  return vget_lane_s32(vget_low_s32(v.raw), 0);
++  return vgetq_lane_s32(v.raw, 0);
+ }
+ template <size_t N>
+ HWY_INLINE int32_t GetLane(const Vec128<int32_t, N> v) {
+@@ -720,20 +735,20 @@ HWY_INLINE int32_t GetLane(const Vec128<
+ }
+ 
+ HWY_INLINE uint64_t GetLane(const Vec128<uint64_t, 2> v) {
+-  return vget_lane_u64(vget_low_u64(v.raw), 0);
++  return vgetq_lane_u64(v.raw, 0);
+ }
+ HWY_INLINE uint64_t GetLane(const Vec128<uint64_t, 1> v) {
+   return vget_lane_u64(v.raw, 0);
+ }
+ HWY_INLINE int64_t GetLane(const Vec128<int64_t, 2> v) {
+-  return vget_lane_s64(vget_low_s64(v.raw), 0);
++  return vgetq_lane_s64(v.raw, 0);
+ }
+ HWY_INLINE int64_t GetLane(const Vec128<int64_t, 1> v) {
+   return vget_lane_s64(v.raw, 0);
+ }
+ 
+ HWY_INLINE float GetLane(const Vec128<float, 4> v) {
+-  return vget_lane_f32(vget_low_f32(v.raw), 0);
++  return vgetq_lane_f32(v.raw, 0);
+ }
+ HWY_INLINE float GetLane(const Vec128<float, 2> v) {
+   return vget_lane_f32(v.raw, 0);
+@@ -743,7 +758,7 @@ HWY_INLINE float GetLane(const Vec128<fl
+ }
+ #if HWY_ARCH_ARM_A64
+ HWY_INLINE double GetLane(const Vec128<double, 2> v) {
+-  return vget_lane_f64(vget_low_f64(v.raw), 0);
++  return vgetq_lane_f64(v.raw, 0);
+ }
+ HWY_INLINE double GetLane(const Vec128<double, 1> v) {
+   return vget_lane_f64(v.raw, 0);
+@@ -785,8 +800,6 @@ HWY_NEON_DEF_FUNCTION_INT_64(SaturatedSu
+ // ------------------------------ Average
+ 
+ // Returns (a + b + 1) / 2
+-
+-// Unsigned
+ HWY_NEON_DEF_FUNCTION_UINT_8(AverageRound, vrhadd, _, 2)
+ HWY_NEON_DEF_FUNCTION_UINT_16(AverageRound, vrhadd, _, 2)
+ 
+@@ -802,6 +815,7 @@ HWY_INLINE Vec128<int16_t> Abs(const Vec
+ HWY_INLINE Vec128<int32_t> Abs(const Vec128<int32_t> v) {
+   return Vec128<int32_t>(vabsq_s32(v.raw));
+ }
++// i64 is implemented after BroadcastSignBit.
+ HWY_INLINE Vec128<float> Abs(const Vec128<float> v) {
+   return Vec128<float>(vabsq_f32(v.raw));
+ }
+@@ -1184,21 +1198,34 @@ HWY_INLINE Vec128<float, N> ApproximateR
+ #if HWY_ARCH_ARM_A64
+ HWY_NEON_DEF_FUNCTION_ALL_FLOATS(operator/, vdiv, _, 2)
+ #else
+-// Emulated with approx reciprocal + Newton-Raphson + mul
++// Not defined on armv7: approximate
++namespace detail {
++
++HWY_INLINE Vec128<float> ReciprocalNewtonRaphsonStep(
++    const Vec128<float> recip, const Vec128<float> divisor) {
++  return Vec128<float>(vrecpsq_f32(recip.raw, divisor.raw));
++}
++template <size_t N>
++HWY_INLINE Vec128<float, N> ReciprocalNewtonRaphsonStep(
++    const Vec128<float, N> recip, Vec128<float, N> divisor) {
++  return Vec128<float, N>(vrecps_f32(recip.raw, divisor.raw));
++}
++
++}  // namespace detail
++
+ template <size_t N>
+ HWY_INLINE Vec128<float, N> operator/(const Vec128<float, N> a,
+                                       const Vec128<float, N> b) {
+   auto x = ApproximateReciprocal(b);
+-  // Newton-Raphson on 1/x - b
+-  const auto two = Set(Simd<float, N>(), 2);
+-  x = x * (two - b * x);
+-  x = x * (two - b * x);
+-  x = x * (two - b * x);
++  x *= detail::ReciprocalNewtonRaphsonStep(x, b);
++  x *= detail::ReciprocalNewtonRaphsonStep(x, b);
++  x *= detail::ReciprocalNewtonRaphsonStep(x, b);
+   return a * x;
+ }
+ #endif
+ 
+-// Absolute value of difference.
++// ------------------------------ Absolute value of difference.
++
+ HWY_INLINE Vec128<float> AbsDiff(const Vec128<float> a, const Vec128<float> b) {
+   return Vec128<float>(vabdq_f32(a.raw, b.raw));
+ }
+@@ -1312,7 +1339,7 @@ HWY_INLINE Vec128<double, N> NegMulSub(c
+ }
+ #endif
+ 
+-// ------------------------------ Floating-point square root
++// ------------------------------ Floating-point square root (IfThenZeroElse)
+ 
+ // Approximate reciprocal square root
+ HWY_INLINE Vec128<float> ApproximateReciprocalSqrt(const Vec128<float> v) {
+@@ -1328,77 +1355,33 @@ HWY_INLINE Vec128<float, N> ApproximateR
+ #if HWY_ARCH_ARM_A64
+ HWY_NEON_DEF_FUNCTION_ALL_FLOATS(Sqrt, vsqrt, _, 1)
+ #else
+-// Not defined on armv7: emulate with approx reciprocal sqrt + Goldschmidt.
+-template <size_t N>
+-HWY_INLINE Vec128<float, N> Sqrt(const Vec128<float, N> v) {
+-  auto b = v;
+-  auto Y = ApproximateReciprocalSqrt(v);
+-  auto x = v * Y;
+-  const auto half = Set(Simd<float, N>(), 0.5);
+-  const auto oneandhalf = Set(Simd<float, N>(), 1.5);
+-  for (size_t i = 0; i < 3; i++) {
+-    b = b * Y * Y;
+-    Y = oneandhalf - half * b;
+-    x = x * Y;
+-  }
+-  return IfThenZeroElse(v == Zero(Simd<float, N>()), x);
+-}
+-#endif
+-
+-// ================================================== COMPARE
+-
+-// Comparisons fill a lane with 1-bits if the condition is true, else 0.
++namespace detail {
+ 
+-template <typename TFrom, typename TTo, size_t N>
+-HWY_API Mask128<TTo, N> RebindMask(Simd<TTo, N> /*tag*/, Mask128<TFrom, N> m) {
+-  static_assert(sizeof(TFrom) == sizeof(TTo), "Must have same size");
+-  return Mask128<TTo, N>{m.raw};
++HWY_INLINE Vec128<float> ReciprocalSqrtStep(const Vec128<float> root,
++                                            const Vec128<float> recip) {
++  return Vec128<float>(vrsqrtsq_f32(root.raw, recip.raw));
++}
++template <size_t N>
++HWY_INLINE Vec128<float, N> ReciprocalSqrtStep(const Vec128<float, N> root,
++                                               Vec128<float, N> recip) {
++  return Vec128<float, N>(vrsqrts_f32(root.raw, recip.raw));
+ }
+ 
+-#define HWY_NEON_BUILD_TPL_HWY_COMPARE
+-#define HWY_NEON_BUILD_RET_HWY_COMPARE(type, size) Mask128<type, size>
+-#define HWY_NEON_BUILD_PARAM_HWY_COMPARE(type, size) \
+-  const Vec128<type, size> a, const Vec128<type, size> b
+-#define HWY_NEON_BUILD_ARG_HWY_COMPARE a.raw, b.raw
+-
+-// ------------------------------ Equality
+-HWY_NEON_DEF_FUNCTION_ALL_FLOATS(operator==, vceq, _, HWY_COMPARE)
+-#if HWY_ARCH_ARM_A64
+-HWY_NEON_DEF_FUNCTION_INTS_UINTS(operator==, vceq, _, HWY_COMPARE)
+-#else
+-// No 64-bit comparisons on armv7: emulate them below, after Shuffle2301.
+-HWY_NEON_DEF_FUNCTION_INT_8_16_32(operator==, vceq, _, HWY_COMPARE)
+-HWY_NEON_DEF_FUNCTION_UINT_8_16_32(operator==, vceq, _, HWY_COMPARE)
+-#endif
++}  // namespace detail
+ 
+-// ------------------------------ Strict inequality
++// Not defined on armv7: approximate
++template <size_t N>
++HWY_INLINE Vec128<float, N> Sqrt(const Vec128<float, N> v) {
++  auto recip = ApproximateReciprocalSqrt(v);
+ 
+-// Signed/float < (no unsigned)
+-#if HWY_ARCH_ARM_A64
+-HWY_NEON_DEF_FUNCTION_INTS(operator<, vclt, _, HWY_COMPARE)
+-#else
+-HWY_NEON_DEF_FUNCTION_INT_8_16_32(operator<, vclt, _, HWY_COMPARE)
+-#endif
+-HWY_NEON_DEF_FUNCTION_ALL_FLOATS(operator<, vclt, _, HWY_COMPARE)
++  recip *= detail::ReciprocalSqrtStep(v * recip, recip);
++  recip *= detail::ReciprocalSqrtStep(v * recip, recip);
++  recip *= detail::ReciprocalSqrtStep(v * recip, recip);
+ 
+-// Signed/float > (no unsigned)
+-#if HWY_ARCH_ARM_A64
+-HWY_NEON_DEF_FUNCTION_INTS(operator>, vcgt, _, HWY_COMPARE)
+-#else
+-HWY_NEON_DEF_FUNCTION_INT_8_16_32(operator>, vcgt, _, HWY_COMPARE)
++  const auto root = v * recip;
++  return IfThenZeroElse(v == Zero(Simd<float, N>()), root);
++}
+ #endif
+-HWY_NEON_DEF_FUNCTION_ALL_FLOATS(operator>, vcgt, _, HWY_COMPARE)
+-
+-// ------------------------------ Weak inequality
+-
+-// Float <= >=
+-HWY_NEON_DEF_FUNCTION_ALL_FLOATS(operator<=, vcle, _, HWY_COMPARE)
+-HWY_NEON_DEF_FUNCTION_ALL_FLOATS(operator>=, vcge, _, HWY_COMPARE)
+-
+-#undef HWY_NEON_BUILD_TPL_HWY_COMPARE
+-#undef HWY_NEON_BUILD_RET_HWY_COMPARE
+-#undef HWY_NEON_BUILD_PARAM_HWY_COMPARE
+-#undef HWY_NEON_BUILD_ARG_HWY_COMPARE
+ 
+ // ================================================== LOGICAL
+ 
+@@ -1407,13 +1390,16 @@ HWY_NEON_DEF_FUNCTION_ALL_FLOATS(operato
+ // There is no 64-bit vmvn, so cast instead of using HWY_NEON_DEF_FUNCTION.
+ template <typename T>
+ HWY_INLINE Vec128<T> Not(const Vec128<T> v) {
+-  const Full128<uint8_t> d8;
+-  return Vec128<T>(vmvnq_u8(BitCast(d8, v).raw));
++  const Full128<T> d;
++  const Repartition<uint8_t, decltype(d)> d8;
++  return BitCast(d, Vec128<uint8_t>(vmvnq_u8(BitCast(d8, v).raw)));
+ }
+ template <typename T, size_t N, HWY_IF_LE64(T, N)>
+ HWY_INLINE Vec128<T, N> Not(const Vec128<T, N> v) {
+-  const Repartition<uint8_t, Simd<T, N>> d8;
+-  return Vec128<T, N>(vmvn_u8(BitCast(d8, v).raw));
++  const Simd<T, N> d;
++  const Repartition<uint8_t, decltype(d)> d8;
++  using V8 = decltype(Zero(d8));
++  return BitCast(d, V8(vmvn_u8(BitCast(d8, v).raw)));
+ }
+ 
+ // ------------------------------ And
+@@ -1513,33 +1499,38 @@ HWY_API Vec128<T, N> BroadcastSignBit(co
+   return ShiftRight<sizeof(T) * 8 - 1>(v);
+ }
+ 
+-// ------------------------------ Make mask
++// ================================================== MASK
+ 
+-template <typename T, size_t N>
+-HWY_INLINE Mask128<T, N> TestBit(Vec128<T, N> v, Vec128<T, N> bit) {
+-  static_assert(!hwy::IsFloat<T>(), "Only integer vectors supported");
+-  return (v & bit) == bit;
+-}
++// ------------------------------ To/from vector
+ 
+-// Mask and Vec are the same (true = FF..FF).
++// Mask and Vec have the same representation (true = FF..FF).
+ template <typename T, size_t N>
+ HWY_INLINE Mask128<T, N> MaskFromVec(const Vec128<T, N> v) {
+-  return Mask128<T, N>(v.raw);
++  const Simd<MakeUnsigned<T>, N> du;
++  return Mask128<T, N>(BitCast(du, v).raw);
+ }
+ 
++// DEPRECATED
+ template <typename T, size_t N>
+ HWY_INLINE Vec128<T, N> VecFromMask(const Mask128<T, N> v) {
+-  return Vec128<T, N>(v.raw);
++  return BitCast(Simd<T, N>(), Vec128<MakeUnsigned<T>, N>(v.raw));
+ }
+ 
+ template <typename T, size_t N>
+-HWY_INLINE Vec128<T, N> VecFromMask(Simd<T, N> /* tag */,
+-                                     const Mask128<T, N> v) {
+-  return Vec128<T, N>(v.raw);
++HWY_INLINE Vec128<T, N> VecFromMask(Simd<T, N> d, const Mask128<T, N> v) {
++  return BitCast(d, Vec128<MakeUnsigned<T>, N>(v.raw));
++}
++
++// ------------------------------ RebindMask
++
++template <typename TFrom, typename TTo, size_t N>
++HWY_API Mask128<TTo, N> RebindMask(Simd<TTo, N> dto, Mask128<TFrom, N> m) {
++  static_assert(sizeof(TFrom) == sizeof(TTo), "Must have same size");
++  return MaskFromVec(BitCast(dto, VecFromMask(Simd<TFrom, N>(), m)));
+ }
+ 
+-// IfThenElse(mask, yes, no)
+-// Returns mask ? b : a.
++// ------------------------------ IfThenElse(mask, yes, no) = mask ? b : a.
++
+ #define HWY_NEON_BUILD_TPL_HWY_IF
+ #define HWY_NEON_BUILD_RET_HWY_IF(type, size) Vec128<type, size>
+ #define HWY_NEON_BUILD_PARAM_HWY_IF(type, size)                 \
+@@ -1574,7 +1565,6 @@ HWY_INLINE Vec128<T, N> ZeroIfNegative(V
+   return Max(zero, v);
+ }
+ 
+-
+ // ------------------------------ Mask logical
+ 
+ template <typename T, size_t N>
+@@ -1607,30 +1597,183 @@ HWY_API Mask128<T, N> Xor(const Mask128<
+   return MaskFromVec(Xor(VecFromMask(d, a), VecFromMask(d, b)));
+ }
+ 
+-// ------------------------------ Min (IfThenElse, BroadcastSignBit)
++// ================================================== COMPARE
+ 
+-namespace detail {
++// Comparisons fill a lane with 1-bits if the condition is true, else 0.
++
++// ------------------------------ Shuffle2301 (for i64 compares)
++
++// Swap 32-bit halves in 64-bits
++HWY_INLINE Vec128<uint32_t, 2> Shuffle2301(const Vec128<uint32_t, 2> v) {
++  return Vec128<uint32_t, 2>(vrev64_u32(v.raw));
++}
++HWY_INLINE Vec128<int32_t, 2> Shuffle2301(const Vec128<int32_t, 2> v) {
++  return Vec128<int32_t, 2>(vrev64_s32(v.raw));
++}
++HWY_INLINE Vec128<float, 2> Shuffle2301(const Vec128<float, 2> v) {
++  return Vec128<float, 2>(vrev64_f32(v.raw));
++}
++HWY_INLINE Vec128<uint32_t> Shuffle2301(const Vec128<uint32_t> v) {
++  return Vec128<uint32_t>(vrev64q_u32(v.raw));
++}
++HWY_INLINE Vec128<int32_t> Shuffle2301(const Vec128<int32_t> v) {
++  return Vec128<int32_t>(vrev64q_s32(v.raw));
++}
++HWY_INLINE Vec128<float> Shuffle2301(const Vec128<float> v) {
++  return Vec128<float>(vrev64q_f32(v.raw));
++}
++
++#define HWY_NEON_BUILD_TPL_HWY_COMPARE
++#define HWY_NEON_BUILD_RET_HWY_COMPARE(type, size) Mask128<type, size>
++#define HWY_NEON_BUILD_PARAM_HWY_COMPARE(type, size) \
++  const Vec128<type, size> a, const Vec128<type, size> b
++#define HWY_NEON_BUILD_ARG_HWY_COMPARE a.raw, b.raw
+ 
++// ------------------------------ Equality
++HWY_NEON_DEF_FUNCTION_ALL_FLOATS(operator==, vceq, _, HWY_COMPARE)
+ #if HWY_ARCH_ARM_A64
++HWY_NEON_DEF_FUNCTION_INTS_UINTS(operator==, vceq, _, HWY_COMPARE)
++#else
++// No 64-bit comparisons on armv7: emulate them below, after Shuffle2301.
++HWY_NEON_DEF_FUNCTION_INT_8_16_32(operator==, vceq, _, HWY_COMPARE)
++HWY_NEON_DEF_FUNCTION_UINT_8_16_32(operator==, vceq, _, HWY_COMPARE)
++#endif
+ 
+-HWY_INLINE Vec128<uint64_t> Gt(Vec128<uint64_t> a, Vec128<uint64_t> b) {
+-  return Vec128<uint64_t>(vcgtq_u64(a.raw, b.raw));
++// ------------------------------ Strict inequality (signed, float)
++#if HWY_ARCH_ARM_A64
++HWY_NEON_DEF_FUNCTION_INTS(operator<, vclt, _, HWY_COMPARE)
++#else
++HWY_NEON_DEF_FUNCTION_INT_8_16_32(operator<, vclt, _, HWY_COMPARE)
++#endif
++HWY_NEON_DEF_FUNCTION_ALL_FLOATS(operator<, vclt, _, HWY_COMPARE)
++
++// ------------------------------ Weak inequality (float)
++HWY_NEON_DEF_FUNCTION_ALL_FLOATS(operator<=, vcle, _, HWY_COMPARE)
++
++#undef HWY_NEON_BUILD_TPL_HWY_COMPARE
++#undef HWY_NEON_BUILD_RET_HWY_COMPARE
++#undef HWY_NEON_BUILD_PARAM_HWY_COMPARE
++#undef HWY_NEON_BUILD_ARG_HWY_COMPARE
++
++// ------------------------------ ARMv7 i64 compare (Shuffle2301, Eq)
++
++#if HWY_ARCH_ARM_V7
++
++template <size_t N>
++HWY_INLINE Mask128<int64_t, N> operator==(const Vec128<int64_t, N> a,
++                                          const Vec128<int64_t, N> b) {
++  const Simd<int32_t, N * 2> d32;
++  const Simd<int64_t, N> d64;
++  const auto cmp32 = VecFromMask(d32, Eq(BitCast(d32, a), BitCast(d32, b)));
++  const auto cmp64 = cmp32 & Shuffle2301(cmp32);
++  return MaskFromVec(BitCast(d64, cmp64));
+ }
+-HWY_INLINE Vec128<uint64_t, 1> Gt(Vec128<uint64_t, 1> a,
+-                                  Vec128<uint64_t, 1> b) {
+-  return Vec128<uint64_t, 1>(vcgt_u64(a.raw, b.raw));
++
++template <size_t N>
++HWY_INLINE Mask128<uint64_t, N> operator==(const Vec128<uint64_t, N> a,
++                                           const Vec128<uint64_t, N> b) {
++  const Simd<uint32_t, N * 2> d32;
++  const Simd<uint64_t, N> d64;
++  const auto cmp32 = VecFromMask(d32, Eq(BitCast(d32, a), BitCast(d32, b)));
++  const auto cmp64 = cmp32 & Shuffle2301(cmp32);
++  return MaskFromVec(BitCast(d64, cmp64));
+ }
+ 
+-HWY_INLINE Vec128<int64_t> Gt(Vec128<int64_t> a, Vec128<int64_t> b) {
+-  return Vec128<int64_t>(vcgtq_s64(a.raw, b.raw));
++HWY_INLINE Mask128<int64_t> operator<(const Vec128<int64_t> a,
++                                      const Vec128<int64_t> b) {
++  const int64x2_t sub = vqsubq_s64(a.raw, b.raw);
++  return MaskFromVec(BroadcastSignBit(Vec128<int64_t>(sub)));
+ }
+-HWY_INLINE Vec128<int64_t, 1> Gt(Vec128<int64_t, 1> a, Vec128<int64_t, 1> b) {
+-  return Vec128<int64_t, 1>(vcgt_s64(a.raw, b.raw));
++HWY_INLINE Mask128<int64_t, 1> operator<(const Vec128<int64_t, 1> a,
++                                         const Vec128<int64_t, 1> b) {
++  const int64x1_t sub = vqsub_s64(a.raw, b.raw);
++  return MaskFromVec(BroadcastSignBit(Vec128<int64_t, 1>(sub)));
+ }
+ 
+ #endif
+ 
+-}  // namespace detail
++// ------------------------------ Reversed comparisons
++
++template <typename T, size_t N>
++HWY_API Mask128<T, N> operator>(Vec128<T, N> a, Vec128<T, N> b) {
++  return operator<(b, a);
++}
++template <typename T, size_t N>
++HWY_API Mask128<T, N> operator>=(Vec128<T, N> a, Vec128<T, N> b) {
++  return operator<=(b, a);
++}
++
++// ------------------------------ FirstN (Iota, Lt)
++
++template <typename T, size_t N>
++HWY_API Mask128<T, N> FirstN(const Simd<T, N> d, size_t num) {
++  const RebindToSigned<decltype(d)> di;  // Signed comparisons are cheaper.
++  return RebindMask(d, Iota(di, 0) < Set(di, static_cast<MakeSigned<T>>(num)));
++}
++
++// ------------------------------ TestBit (Eq)
++
++#define HWY_NEON_BUILD_TPL_HWY_TESTBIT
++#define HWY_NEON_BUILD_RET_HWY_TESTBIT(type, size) Mask128<type, size>
++#define HWY_NEON_BUILD_PARAM_HWY_TESTBIT(type, size) \
++  Vec128<type, size> v, Vec128<type, size> bit
++#define HWY_NEON_BUILD_ARG_HWY_TESTBIT v.raw, bit.raw
++
++#if HWY_ARCH_ARM_A64
++HWY_NEON_DEF_FUNCTION_INTS_UINTS(TestBit, vtst, _, HWY_TESTBIT)
++#else
++// No 64-bit versions on armv7
++HWY_NEON_DEF_FUNCTION_UINT_8_16_32(TestBit, vtst, _, HWY_TESTBIT)
++HWY_NEON_DEF_FUNCTION_INT_8_16_32(TestBit, vtst, _, HWY_TESTBIT)
++
++template <size_t N>
++HWY_INLINE Mask128<uint64_t, N> TestBit(Vec128<uint64_t, N> v,
++                                        Vec128<uint64_t, N> bit) {
++  return (v & bit) == bit;
++}
++template <size_t N>
++HWY_INLINE Mask128<int64_t, N> TestBit(Vec128<int64_t, N> v,
++                                       Vec128<int64_t, N> bit) {
++  return (v & bit) == bit;
++}
++
++#endif
++#undef HWY_NEON_BUILD_TPL_HWY_TESTBIT
++#undef HWY_NEON_BUILD_RET_HWY_TESTBIT
++#undef HWY_NEON_BUILD_PARAM_HWY_TESTBIT
++#undef HWY_NEON_BUILD_ARG_HWY_TESTBIT
++
++// ------------------------------ Abs i64 (IfThenElse, BroadcastSignBit)
++HWY_INLINE Vec128<int64_t> Abs(const Vec128<int64_t> v) {
++#if HWY_ARCH_ARM_A64
++  return Vec128<int64_t>(vabsq_s64(v.raw));
++#else
++  const auto zero = Zero(Full128<int64_t>());
++  return IfThenElse(MaskFromVec(BroadcastSignBit(v)), zero - v, v);
++#endif
++}
++HWY_INLINE Vec128<int64_t, 1> Abs(const Vec128<int64_t, 1> v) {
++#if HWY_ARCH_ARM_A64
++  return Vec128<int64_t, 1>(vabs_s64(v.raw));
++#else
++  const auto zero = Zero(Simd<int64_t, 1>());
++  return IfThenElse(MaskFromVec(BroadcastSignBit(v)), zero - v, v);
++#endif
++}
++
++// ------------------------------ Min (IfThenElse, BroadcastSignBit)
++
++#if HWY_ARCH_ARM_A64
++
++HWY_INLINE Mask128<uint64_t> operator<(Vec128<uint64_t> a, Vec128<uint64_t> b) {
++  return Mask128<uint64_t>(vcltq_u64(a.raw, b.raw));
++}
++HWY_INLINE Mask128<uint64_t, 1> operator<(Vec128<uint64_t, 1> a,
++                                          Vec128<uint64_t, 1> b) {
++  return Mask128<uint64_t, 1>(vclt_u64(a.raw, b.raw));
++}
++
++#endif
+ 
+ // Unsigned
+ HWY_NEON_DEF_FUNCTION_UINT_8_16_32(Min, vmin, _, 2)
+@@ -1639,7 +1782,7 @@ template <size_t N>
+ HWY_INLINE Vec128<uint64_t, N> Min(const Vec128<uint64_t, N> a,
+                                    const Vec128<uint64_t, N> b) {
+ #if HWY_ARCH_ARM_A64
+-  return IfThenElse(MaskFromVec(detail::Gt(a, b)), b, a);
++  return IfThenElse(b < a, b, a);
+ #else
+   const Simd<uint64_t, N> du;
+   const Simd<int64_t, N> di;
+@@ -1654,7 +1797,7 @@ template <size_t N>
+ HWY_INLINE Vec128<int64_t, N> Min(const Vec128<int64_t, N> a,
+                                   const Vec128<int64_t, N> b) {
+ #if HWY_ARCH_ARM_A64
+-  return IfThenElse(MaskFromVec(detail::Gt(a, b)), b, a);
++  return IfThenElse(b < a, b, a);
+ #else
+   const Vec128<int64_t, N> sign = detail::SaturatedSub(a, b);
+   return IfThenElse(MaskFromVec(BroadcastSignBit(sign)), a, b);
+@@ -1677,7 +1820,7 @@ template <size_t N>
+ HWY_INLINE Vec128<uint64_t, N> Max(const Vec128<uint64_t, N> a,
+                                    const Vec128<uint64_t, N> b) {
+ #if HWY_ARCH_ARM_A64
+-  return IfThenElse(MaskFromVec(detail::Gt(a, b)), a, b);
++  return IfThenElse(b < a, a, b);
+ #else
+   const Simd<uint64_t, N> du;
+   const Simd<int64_t, N> di;
+@@ -1692,7 +1835,7 @@ template <size_t N>
+ HWY_INLINE Vec128<int64_t, N> Max(const Vec128<int64_t, N> a,
+                                   const Vec128<int64_t, N> b) {
+ #if HWY_ARCH_ARM_A64
+-  return IfThenElse(MaskFromVec(detail::Gt(a, b)), a, b);
++  return IfThenElse(b < a, a, b);
+ #else
+   const Vec128<int64_t, N> sign = detail::SaturatedSub(a, b);
+   return IfThenElse(MaskFromVec(BroadcastSignBit(sign)), b, a);
+@@ -1805,73 +1948,72 @@ HWY_INLINE Vec128<double, 1> LoadU(Simd<
+ // we don't actually care what is in it, and we don't want
+ // to introduce extra overhead by initializing it to something.
+ 
+-HWY_INLINE Vec128<uint8_t, 4> LoadU(Simd<uint8_t, 4> d,
++HWY_INLINE Vec128<uint8_t, 4> LoadU(Simd<uint8_t, 4> /*tag*/,
+                                     const uint8_t* HWY_RESTRICT p) {
+-  uint32x2_t a = Undefined(d).raw;
++  uint32x2_t a = Undefined(Simd<uint32_t, 2>()).raw;
+   uint32x2_t b = vld1_lane_u32(reinterpret_cast<const uint32_t*>(p), a, 0);
+   return Vec128<uint8_t, 4>(vreinterpret_u8_u32(b));
+ }
+-HWY_INLINE Vec128<uint16_t, 2> LoadU(Simd<uint16_t, 2> d,
++HWY_INLINE Vec128<uint16_t, 2> LoadU(Simd<uint16_t, 2> /*tag*/,
+                                      const uint16_t* HWY_RESTRICT p) {
+-  uint32x2_t a = Undefined(d).raw;
++  uint32x2_t a = Undefined(Simd<uint32_t, 2>()).raw;
+   uint32x2_t b = vld1_lane_u32(reinterpret_cast<const uint32_t*>(p), a, 0);
+   return Vec128<uint16_t, 2>(vreinterpret_u16_u32(b));
+ }
+-HWY_INLINE Vec128<uint32_t, 1> LoadU(Simd<uint32_t, 1> d,
++HWY_INLINE Vec128<uint32_t, 1> LoadU(Simd<uint32_t, 1> /*tag*/,
+                                      const uint32_t* HWY_RESTRICT p) {
+-  uint32x2_t a = Undefined(d).raw;
++  uint32x2_t a = Undefined(Simd<uint32_t, 2>()).raw;
+   uint32x2_t b = vld1_lane_u32(p, a, 0);
+   return Vec128<uint32_t, 1>(b);
+ }
+-HWY_INLINE Vec128<int8_t, 4> LoadU(Simd<int8_t, 4> d,
++HWY_INLINE Vec128<int8_t, 4> LoadU(Simd<int8_t, 4> /*tag*/,
+                                    const int8_t* HWY_RESTRICT p) {
+-  int32x2_t a = Undefined(d).raw;
++  int32x2_t a = Undefined(Simd<int32_t, 2>()).raw;
+   int32x2_t b = vld1_lane_s32(reinterpret_cast<const int32_t*>(p), a, 0);
+   return Vec128<int8_t, 4>(vreinterpret_s8_s32(b));
+ }
+-HWY_INLINE Vec128<int16_t, 2> LoadU(Simd<int16_t, 2> d,
++HWY_INLINE Vec128<int16_t, 2> LoadU(Simd<int16_t, 2> /*tag*/,
+                                     const int16_t* HWY_RESTRICT p) {
+-  int32x2_t a = Undefined(d).raw;
++  int32x2_t a = Undefined(Simd<int32_t, 2>()).raw;
+   int32x2_t b = vld1_lane_s32(reinterpret_cast<const int32_t*>(p), a, 0);
+   return Vec128<int16_t, 2>(vreinterpret_s16_s32(b));
+ }
+-HWY_INLINE Vec128<int32_t, 1> LoadU(Simd<int32_t, 1> d,
++HWY_INLINE Vec128<int32_t, 1> LoadU(Simd<int32_t, 1> /*tag*/,
+                                     const int32_t* HWY_RESTRICT p) {
+-  int32x2_t a = Undefined(d).raw;
++  int32x2_t a = Undefined(Simd<int32_t, 2>()).raw;
+   int32x2_t b = vld1_lane_s32(p, a, 0);
+   return Vec128<int32_t, 1>(b);
+ }
+-HWY_INLINE Vec128<float, 1> LoadU(Simd<float, 1> d,
++HWY_INLINE Vec128<float, 1> LoadU(Simd<float, 1> /*tag*/,
+                                   const float* HWY_RESTRICT p) {
+-  float32x2_t a = Undefined(d).raw;
++  float32x2_t a = Undefined(Simd<float, 2>()).raw;
+   float32x2_t b = vld1_lane_f32(p, a, 0);
+   return Vec128<float, 1>(b);
+ }
+ 
+ // ------------------------------ Load 16
+ 
+-HWY_INLINE Vec128<uint8_t, 2> LoadU(Simd<uint8_t, 2> d,
++HWY_INLINE Vec128<uint8_t, 2> LoadU(Simd<uint8_t, 2> /*tag*/,
+                                     const uint8_t* HWY_RESTRICT p) {
+-  uint16x4_t a = Undefined(d).raw;
++  uint16x4_t a = Undefined(Simd<uint16_t, 4>()).raw;
+   uint16x4_t b = vld1_lane_u16(reinterpret_cast<const uint16_t*>(p), a, 0);
+   return Vec128<uint8_t, 2>(vreinterpret_u8_u16(b));
+ }
+-HWY_INLINE Vec128<uint16_t, 1> LoadU(Simd<uint16_t, 1> d,
++HWY_INLINE Vec128<uint16_t, 1> LoadU(Simd<uint16_t, 1> /*tag*/,
+                                      const uint16_t* HWY_RESTRICT p) {
+-  uint16x4_t a = Undefined(d).raw;
++  uint16x4_t a = Undefined(Simd<uint16_t, 4>()).raw;
+   uint16x4_t b = vld1_lane_u16(p, a, 0);
+   return Vec128<uint16_t, 1>(b);
+ }
+-
+-HWY_INLINE Vec128<int8_t, 2> LoadU(Simd<int8_t, 2> d,
++HWY_INLINE Vec128<int8_t, 2> LoadU(Simd<int8_t, 2> /*tag*/,
+                                    const int8_t* HWY_RESTRICT p) {
+-  int16x4_t a = Undefined(d).raw;
++  int16x4_t a = Undefined(Simd<int16_t, 4>()).raw;
+   int16x4_t b = vld1_lane_s16(reinterpret_cast<const int16_t*>(p), a, 0);
+   return Vec128<int8_t, 2>(vreinterpret_s8_s16(b));
+ }
+-HWY_INLINE Vec128<int16_t, 1> LoadU(Simd<int16_t, 1> d,
++HWY_INLINE Vec128<int16_t, 1> LoadU(Simd<int16_t, 1> /*tag*/,
+                                     const int16_t* HWY_RESTRICT p) {
+-  int16x4_t a = Undefined(d).raw;
++  int16x4_t a = Undefined(Simd<int16_t, 4>()).raw;
+   int16x4_t b = vld1_lane_s16(p, a, 0);
+   return Vec128<int16_t, 1>(b);
+ }
+@@ -2009,12 +2151,12 @@ HWY_INLINE void StoreU(const Vec128<doub
+ HWY_INLINE void StoreU(const Vec128<uint8_t, 4> v, Simd<uint8_t, 4>,
+                        uint8_t* HWY_RESTRICT p) {
+   uint32x2_t a = vreinterpret_u32_u8(v.raw);
+-  vst1_lane_u32(p, a, 0);
++  vst1_lane_u32(reinterpret_cast<uint32_t*>(p), a, 0);
+ }
+ HWY_INLINE void StoreU(const Vec128<uint16_t, 2> v, Simd<uint16_t, 2>,
+                        uint16_t* HWY_RESTRICT p) {
+   uint32x2_t a = vreinterpret_u32_u16(v.raw);
+-  vst1_lane_u32(p, a, 0);
++  vst1_lane_u32(reinterpret_cast<uint32_t*>(p), a, 0);
+ }
+ HWY_INLINE void StoreU(const Vec128<uint32_t, 1> v, Simd<uint32_t, 1>,
+                        uint32_t* HWY_RESTRICT p) {
+@@ -2023,12 +2165,12 @@ HWY_INLINE void StoreU(const Vec128<uint
+ HWY_INLINE void StoreU(const Vec128<int8_t, 4> v, Simd<int8_t, 4>,
+                        int8_t* HWY_RESTRICT p) {
+   int32x2_t a = vreinterpret_s32_s8(v.raw);
+-  vst1_lane_s32(p, a, 0);
++  vst1_lane_s32(reinterpret_cast<int32_t*>(p), a, 0);
+ }
+ HWY_INLINE void StoreU(const Vec128<int16_t, 2> v, Simd<int16_t, 2>,
+                        int16_t* HWY_RESTRICT p) {
+   int32x2_t a = vreinterpret_s32_s16(v.raw);
+-  vst1_lane_s32(p, a, 0);
++  vst1_lane_s32(reinterpret_cast<int32_t*>(p), a, 0);
+ }
+ HWY_INLINE void StoreU(const Vec128<int32_t, 1> v, Simd<int32_t, 1>,
+                        int32_t* HWY_RESTRICT p) {
+@@ -2044,7 +2186,7 @@ HWY_INLINE void StoreU(const Vec128<floa
+ HWY_INLINE void StoreU(const Vec128<uint8_t, 2> v, Simd<uint8_t, 2>,
+                        uint8_t* HWY_RESTRICT p) {
+   uint16x4_t a = vreinterpret_u16_u8(v.raw);
+-  vst1_lane_u16(p, a, 0);
++  vst1_lane_u16(reinterpret_cast<uint16_t*>(p), a, 0);
+ }
+ HWY_INLINE void StoreU(const Vec128<uint16_t, 1> v, Simd<uint16_t, 1>,
+                        uint16_t* HWY_RESTRICT p) {
+@@ -2053,7 +2195,7 @@ HWY_INLINE void StoreU(const Vec128<uint
+ HWY_INLINE void StoreU(const Vec128<int8_t, 2> v, Simd<int8_t, 2>,
+                        int8_t* HWY_RESTRICT p) {
+   int16x4_t a = vreinterpret_s16_s8(v.raw);
+-  vst1_lane_s16(p, a, 0);
++  vst1_lane_s16(reinterpret_cast<int16_t*>(p), a, 0);
+ }
+ HWY_INLINE void StoreU(const Vec128<int16_t, 1> v, Simd<int16_t, 1>,
+                        int16_t* HWY_RESTRICT p) {
+@@ -2118,18 +2260,18 @@ HWY_INLINE Vec128<uint64_t> PromoteTo(Fu
+                                       const Vec128<uint32_t, 2> v) {
+   return Vec128<uint64_t>(vmovl_u32(v.raw));
+ }
+-HWY_INLINE Vec128<int16_t> PromoteTo(Full128<int16_t> /* tag */,
++HWY_INLINE Vec128<int16_t> PromoteTo(Full128<int16_t> d,
+                                      const Vec128<uint8_t, 8> v) {
+-  return Vec128<int16_t>(vmovl_u8(v.raw));
++  return BitCast(d, Vec128<uint16_t>(vmovl_u8(v.raw)));
+ }
+-HWY_INLINE Vec128<int32_t> PromoteTo(Full128<int32_t> /* tag */,
++HWY_INLINE Vec128<int32_t> PromoteTo(Full128<int32_t> d,
+                                      const Vec128<uint8_t, 4> v) {
+   uint16x8_t a = vmovl_u8(v.raw);
+-  return Vec128<int32_t>(vreinterpretq_s32_u16(vmovl_u16(vget_low_u16(a))));
++  return BitCast(d, Vec128<uint32_t>(vmovl_u16(vget_low_u16(a))));
+ }
+-HWY_INLINE Vec128<int32_t> PromoteTo(Full128<int32_t> /* tag */,
++HWY_INLINE Vec128<int32_t> PromoteTo(Full128<int32_t> d,
+                                      const Vec128<uint16_t, 4> v) {
+-  return Vec128<int32_t>(vmovl_u16(v.raw));
++  return BitCast(d, Vec128<uint32_t>(vmovl_u16(v.raw)));
+ }
+ 
+ // Unsigned: zero-extend to half vector.
+@@ -2155,9 +2297,9 @@ HWY_INLINE Vec128<uint64_t, N> PromoteTo
+   return Vec128<uint64_t, N>(vget_low_u64(vmovl_u32(v.raw)));
+ }
+ template <size_t N, HWY_IF_LE64(int16_t, N)>
+-HWY_INLINE Vec128<int16_t, N> PromoteTo(Simd<int16_t, N> /* tag */,
++HWY_INLINE Vec128<int16_t, N> PromoteTo(Simd<int16_t, N> d,
+                                         const Vec128<uint8_t, N> v) {
+-  return Vec128<int16_t, N>(vget_low_s16(vmovl_u8(v.raw)));
++  return BitCast(d, Vec128<uint16_t, N>(vget_low_u16(vmovl_u8(v.raw))));
+ }
+ template <size_t N, HWY_IF_LE64(int32_t, N)>
+ HWY_INLINE Vec128<int32_t, N> PromoteTo(Simd<int32_t, N> /* tag */,
+@@ -2220,12 +2362,14 @@ HWY_INLINE Vec128<int64_t, N> PromoteTo(
+ 
+ HWY_INLINE Vec128<float> PromoteTo(Full128<float> /* tag */,
+                                    const Vec128<float16_t, 4> v) {
+-  return Vec128<float>(vcvt_f32_f16(vreinterpret_f16_u16(v.raw)));
++  const float32x4_t f32 = vcvt_f32_f16(vreinterpret_f16_u16(v.raw));
++  return Vec128<float>(f32);
+ }
+ template <size_t N>
+ HWY_INLINE Vec128<float, N> PromoteTo(Simd<float, N> /* tag */,
+                                       const Vec128<float16_t, N> v) {
+-  return Vec128<float, N>(vget_low_f32(vcvt_f32_f16(v.raw)));
++  const float32x4_t f32 = vcvt_f32_f16(vreinterpret_f16_u16(v.raw));
++  return Vec128<float, N>(vget_low_f32(f32));
+ }
+ 
+ #else
+@@ -2353,7 +2497,8 @@ HWY_INLINE Vec128<float16_t, 4> DemoteTo
+ template <size_t N>
+ HWY_INLINE Vec128<float16_t, N> DemoteTo(Simd<float16_t, N> /* tag */,
+                                          const Vec128<float, N> v) {
+-  return Vec128<float16_t, N>{vcvt_f16_f32(vcombine_f32(v.raw, v.raw))};
++  const float16x4_t f16 = vcvt_f16_f32(vcombine_f32(v.raw, v.raw));
++  return Vec128<float16_t, N>(vreinterpret_u16_f16(f16));
+ }
+ 
+ #else
+@@ -2965,33 +3110,58 @@ HWY_INLINE Vec128<T, N> TableLookupBytes
+                                                 BitCast(d8, from).raw)));
+ }
+ 
+-// ------------------------------ Hard-coded shuffles
++// ------------------------------ TableLookupLanes
+ 
+-// Notation: let Vec128<int32_t> have lanes 3,2,1,0 (0 is least-significant).
+-// Shuffle0321 rotates one lane to the right (the previous least-significant
+-// lane is now most-significant). These could also be implemented via
+-// CombineShiftRightBytes but the shuffle_abcd notation is more convenient.
++// Returned by SetTableIndices for use by TableLookupLanes.
++template <typename T, size_t N>
++struct Indices128 {
++  typename detail::Raw128<T, N>::type raw;
++};
+ 
+-// Swap 32-bit halves in 64-bits
+-HWY_INLINE Vec128<uint32_t, 2> Shuffle2301(const Vec128<uint32_t, 2> v) {
+-  return Vec128<uint32_t, 2>(vrev64_u32(v.raw));
+-}
+-HWY_INLINE Vec128<int32_t, 2> Shuffle2301(const Vec128<int32_t, 2> v) {
+-  return Vec128<int32_t, 2>(vrev64_s32(v.raw));
+-}
+-HWY_INLINE Vec128<float, 2> Shuffle2301(const Vec128<float, 2> v) {
+-  return Vec128<float, 2>(vrev64_f32(v.raw));
++template <typename T, size_t N, HWY_IF_LE128(T, N)>
++HWY_INLINE Indices128<T, N> SetTableIndices(Simd<T, N> d, const int32_t* idx) {
++#if !defined(NDEBUG) || defined(ADDRESS_SANITIZER)
++  for (size_t i = 0; i < N; ++i) {
++    HWY_DASSERT(0 <= idx[i] && idx[i] < static_cast<int32_t>(N));
++  }
++#endif
++
++  const Repartition<uint8_t, decltype(d)> d8;
++  alignas(16) uint8_t control[16] = {0};
++  for (size_t idx_lane = 0; idx_lane < N; ++idx_lane) {
++    for (size_t idx_byte = 0; idx_byte < sizeof(T); ++idx_byte) {
++      control[idx_lane * sizeof(T) + idx_byte] =
++          static_cast<uint8_t>(idx[idx_lane] * sizeof(T) + idx_byte);
++    }
++  }
++  return Indices128<T, N>{BitCast(d, Load(d8, control)).raw};
+ }
+-HWY_INLINE Vec128<uint32_t> Shuffle2301(const Vec128<uint32_t> v) {
+-  return Vec128<uint32_t>(vrev64q_u32(v.raw));
++
++template <size_t N>
++HWY_INLINE Vec128<uint32_t, N> TableLookupLanes(
++    const Vec128<uint32_t, N> v, const Indices128<uint32_t, N> idx) {
++  return TableLookupBytes(v, Vec128<uint32_t, N>{idx.raw});
+ }
+-HWY_INLINE Vec128<int32_t> Shuffle2301(const Vec128<int32_t> v) {
+-  return Vec128<int32_t>(vrev64q_s32(v.raw));
++template <size_t N>
++HWY_INLINE Vec128<int32_t, N> TableLookupLanes(
++    const Vec128<int32_t, N> v, const Indices128<int32_t, N> idx) {
++  return TableLookupBytes(v, Vec128<int32_t, N>{idx.raw});
+ }
+-HWY_INLINE Vec128<float> Shuffle2301(const Vec128<float> v) {
+-  return Vec128<float>(vrev64q_f32(v.raw));
++template <size_t N>
++HWY_INLINE Vec128<float, N> TableLookupLanes(const Vec128<float, N> v,
++                                             const Indices128<float, N> idx) {
++  const Simd<int32_t, N> di;
++  const auto idx_i = BitCast(di, Vec128<float, N>{idx.raw});
++  return BitCast(Simd<float, N>(), TableLookupBytes(BitCast(di, v), idx_i));
+ }
+ 
++// ------------------------------ Other shuffles (TableLookupBytes)
++
++// Notation: let Vec128<int32_t> have lanes 3,2,1,0 (0 is least-significant).
++// Shuffle0321 rotates one lane to the right (the previous least-significant
++// lane is now most-significant). These could also be implemented via
++// CombineShiftRightBytes but the shuffle_abcd notation is more convenient.
++
+ // Swap 64-bit halves
+ template <typename T>
+ HWY_INLINE Vec128<T> Shuffle1032(const Vec128<T> v) {
+@@ -3029,49 +3199,6 @@ HWY_INLINE Vec128<T> Shuffle0123(const V
+   return TableLookupBytes(v, BitCast(d, Load(d8, bytes)));
+ }
+ 
+-// ------------------------------ TableLookupLanes
+-
+-// Returned by SetTableIndices for use by TableLookupLanes.
+-template <typename T>
+-struct Indices128 {
+-  typename Raw128<T, 16 / sizeof(T)>::type raw;
+-};
+-
+-template <typename T>
+-HWY_INLINE Indices128<T> SetTableIndices(const Full128<T>, const int32_t* idx) {
+-#if !defined(NDEBUG) || defined(ADDRESS_SANITIZER)
+-  const size_t N = 16 / sizeof(T);
+-  for (size_t i = 0; i < N; ++i) {
+-    HWY_DASSERT(0 <= idx[i] && idx[i] < static_cast<int32_t>(N));
+-  }
+-#endif
+-
+-  const Full128<uint8_t> d8;
+-  alignas(16) uint8_t control[16];
+-  for (size_t idx_byte = 0; idx_byte < 16; ++idx_byte) {
+-    const size_t idx_lane = idx_byte / sizeof(T);
+-    const size_t mod = idx_byte % sizeof(T);
+-    control[idx_byte] = idx[idx_lane] * sizeof(T) + mod;
+-  }
+-  return Indices128<T>{BitCast(Full128<T>(), Load(d8, control)).raw};
+-}
+-
+-HWY_INLINE Vec128<uint32_t> TableLookupLanes(const Vec128<uint32_t> v,
+-                                             const Indices128<uint32_t> idx) {
+-  return TableLookupBytes(v, Vec128<uint32_t>(idx.raw));
+-}
+-HWY_INLINE Vec128<int32_t> TableLookupLanes(const Vec128<int32_t> v,
+-                                            const Indices128<int32_t> idx) {
+-  return TableLookupBytes(v, Vec128<int32_t>(idx.raw));
+-}
+-HWY_INLINE Vec128<float> TableLookupLanes(const Vec128<float> v,
+-                                          const Indices128<float> idx) {
+-  const Full128<int32_t> di;
+-  const Full128<float> df;
+-  return BitCast(df,
+-                 TableLookupBytes(BitCast(di, v), Vec128<int32_t>(idx.raw)));
+-}
+-
+ // ------------------------------ Interleave lanes
+ 
+ // Interleaves lanes from halves of the 128-bit blocks of "a" (which provides
+@@ -3334,16 +3461,6 @@ HWY_INLINE Vec128<T> OddEven(const Vec12
+ 
+ // ================================================== MISC
+ 
+-// Returns a vector with lane i=[0, N) set to "first" + i.
+-template <typename T, size_t N, typename T2>
+-Vec128<T, N> Iota(const Simd<T, N> d, const T2 first) {
+-  HWY_ALIGN T lanes[16 / sizeof(T)];
+-  for (size_t i = 0; i < 16 / sizeof(T); ++i) {
+-    lanes[i] = static_cast<T>(first + static_cast<T2>(i));
+-  }
+-  return Load(d, lanes);
+-}
+-
+ // ------------------------------ Scatter (Store)
+ 
+ template <typename T, size_t N, typename Offset, HWY_IF_LE128(T, N)>
+@@ -3413,52 +3530,44 @@ HWY_API Vec128<T, N> GatherIndex(const S
+   return Load(d, lanes);
+ }
+ 
+-// ------------------------------ ARMv7 int64 comparisons (requires Shuffle2301)
++// ------------------------------ Reductions
+ 
+-#if HWY_ARCH_ARM_V7
++namespace detail {
+ 
+-template <size_t N>
+-HWY_INLINE Mask128<int64_t, N> operator==(const Vec128<int64_t, N> a,
+-                                          const Vec128<int64_t, N> b) {
+-  const Simd<int32_t, N * 2> d32;
+-  const Simd<int64_t, N> d64;
+-  const auto cmp32 = VecFromMask(d32, BitCast(d32, a) == BitCast(d32, b));
+-  const auto cmp64 = cmp32 & Shuffle2301(cmp32);
+-  return MaskFromVec(BitCast(d64, cmp64));
++// N=1 for any T: no-op
++template <typename T>
++HWY_API Vec128<T, 1> SumOfLanes(const Vec128<T, 1> v) {
++  return v;
+ }
+-
+-template <size_t N>
+-HWY_INLINE Mask128<uint64_t, N> operator==(const Vec128<uint64_t, N> a,
+-                                           const Vec128<uint64_t, N> b) {
+-  const Simd<uint32_t, N * 2> d32;
+-  const Simd<uint64_t, N> d64;
+-  const auto cmp32 = VecFromMask(d32, BitCast(d32, a) == BitCast(d32, b));
+-  const auto cmp64 = cmp32 & Shuffle2301(cmp32);
+-  return MaskFromVec(BitCast(d64, cmp64));
++template <typename T>
++HWY_API Vec128<T, 1> MinOfLanes(hwy::SizeTag<sizeof(T)> /* tag */,
++                                const Vec128<T, 1> v) {
++  return v;
++}
++template <typename T>
++HWY_API Vec128<T, 1> MaxOfLanes(hwy::SizeTag<sizeof(T)> /* tag */,
++                                const Vec128<T, 1> v) {
++  return v;
+ }
+ 
+-HWY_INLINE Mask128<int64_t> operator<(const Vec128<int64_t> a,
+-                                      const Vec128<int64_t> b) {
+-  const int64x2_t sub = vqsubq_s64(a.raw, b.raw);
+-  return MaskFromVec(BroadcastSignBit(Vec128<int64_t>(sub)));
++// u32/i32/f32: N=2
++template <typename T, HWY_IF_LANE_SIZE(T, 4)>
++HWY_API Vec128<T, 2> SumOfLanes(const Vec128<T, 2> v10) {
++  return v10 + Shuffle2301(v10);
+ }
+-HWY_INLINE Mask128<int64_t, 1> operator<(const Vec128<int64_t, 1> a,
+-                                         const Vec128<int64_t, 1> b) {
+-  const int64x1_t sub = vqsub_s64(a.raw, b.raw);
+-  return MaskFromVec(BroadcastSignBit(Vec128<int64_t, 1>(sub)));
++template <typename T>
++HWY_API Vec128<T, 2> MinOfLanes(hwy::SizeTag<4> /* tag */,
++                                const Vec128<T, 2> v10) {
++  return Min(v10, Shuffle2301(v10));
+ }
+-
+-template <size_t N>
+-HWY_INLINE Mask128<int64_t, N> operator>(const Vec128<int64_t, N> a,
+-                                         const Vec128<int64_t, N> b) {
+-  return b < a;
++template <typename T>
++HWY_API Vec128<T, 2> MaxOfLanes(hwy::SizeTag<4> /* tag */,
++                                const Vec128<T, 2> v10) {
++  return Max(v10, Shuffle2301(v10));
+ }
+-#endif
+-
+-// ------------------------------ Reductions
+ 
++// full vectors
+ #if HWY_ARCH_ARM_A64
+-// Supported for 32b and 64b vector types. Returns the sum in each lane.
+ HWY_INLINE Vec128<uint32_t> SumOfLanes(const Vec128<uint32_t> v) {
+   return Vec128<uint32_t>(vdupq_n_u32(vaddvq_u32(v.raw)));
+ }
+@@ -3505,20 +3614,15 @@ HWY_INLINE Vec128<int64_t> SumOfLanes(co
+ }
+ #endif
+ 
+-namespace detail {
+-
+-// For u32/i32/f32.
+-template <typename T, size_t N>
+-HWY_API Vec128<T, N> MinOfLanes(hwy::SizeTag<4> /* tag */,
+-                                const Vec128<T, N> v3210) {
++template <typename T>
++HWY_API Vec128<T> MinOfLanes(hwy::SizeTag<4> /* tag */, const Vec128<T> v3210) {
+   const Vec128<T> v1032 = Shuffle1032(v3210);
+   const Vec128<T> v31_20_31_20 = Min(v3210, v1032);
+   const Vec128<T> v20_31_20_31 = Shuffle0321(v31_20_31_20);
+   return Min(v20_31_20_31, v31_20_31_20);
+ }
+-template <typename T, size_t N>
+-HWY_API Vec128<T, N> MaxOfLanes(hwy::SizeTag<4> /* tag */,
+-                                const Vec128<T, N> v3210) {
++template <typename T>
++HWY_API Vec128<T> MaxOfLanes(hwy::SizeTag<4> /* tag */, const Vec128<T> v3210) {
+   const Vec128<T> v1032 = Shuffle1032(v3210);
+   const Vec128<T> v31_20_31_20 = Max(v3210, v1032);
+   const Vec128<T> v20_31_20_31 = Shuffle0321(v31_20_31_20);
+@@ -3526,15 +3630,13 @@ HWY_API Vec128<T, N> MaxOfLanes(hwy::Siz
+ }
+ 
+ // For u64/i64[/f64].
+-template <typename T, size_t N>
+-HWY_API Vec128<T, N> MinOfLanes(hwy::SizeTag<8> /* tag */,
+-                                const Vec128<T, N> v10) {
++template <typename T>
++HWY_API Vec128<T> MinOfLanes(hwy::SizeTag<8> /* tag */, const Vec128<T> v10) {
+   const Vec128<T> v01 = Shuffle01(v10);
+   return Min(v10, v01);
+ }
+-template <typename T, size_t N>
+-HWY_API Vec128<T, N> MaxOfLanes(hwy::SizeTag<8> /* tag */,
+-                                const Vec128<T, N> v10) {
++template <typename T>
++HWY_API Vec128<T> MaxOfLanes(hwy::SizeTag<8> /* tag */, const Vec128<T> v10) {
+   const Vec128<T> v01 = Shuffle01(v10);
+   return Max(v10, v01);
+ }
+@@ -3542,6 +3644,10 @@ HWY_API Vec128<T, N> MaxOfLanes(hwy::Siz
+ }  // namespace detail
+ 
+ template <typename T, size_t N>
++HWY_API Vec128<T, N> SumOfLanes(const Vec128<T, N> v) {
++  return detail::SumOfLanes(v);
++}
++template <typename T, size_t N>
+ HWY_API Vec128<T, N> MinOfLanes(const Vec128<T, N> v) {
+   return detail::MinOfLanes(hwy::SizeTag<sizeof(T)>(), v);
+ }
+@@ -3569,13 +3675,13 @@ HWY_INLINE uint64_t BitsFromMask(hwy::Si
+   const uint8x8_t x2 = vget_low_u8(vpaddq_u8(values.raw, values.raw));
+   const uint8x8_t x4 = vpadd_u8(x2, x2);
+   const uint8x8_t x8 = vpadd_u8(x4, x4);
+-  return vreinterpret_u16_u8(x8)[0];
++  return vget_lane_u64(vreinterpret_u64_u8(x8), 0);
+ #else
+   // Don't have vpaddq, so keep doubling lane size.
+   const uint16x8_t x2 = vpaddlq_u8(values.raw);
+   const uint32x4_t x4 = vpaddlq_u16(x2);
+   const uint64x2_t x8 = vpaddlq_u32(x4);
+-  return (uint64_t(x8[1]) << 8) | x8[0];
++  return (vgetq_lane_u64(x8, 1) << 8) | vgetq_lane_u64(x8, 0);
+ #endif
+ }
+ 
+@@ -3725,7 +3831,7 @@ HWY_INLINE size_t CountTrue(hwy::SizeTag
+   const int16x8_t x2 = vpaddlq_s8(ones);
+   const int32x4_t x4 = vpaddlq_s16(x2);
+   const int64x2_t x8 = vpaddlq_s32(x4);
+-  return x8[0] + x8[1];
++  return vgetq_lane_s64(x8, 0) + vgetq_lane_s64(x8, 1);
+ #endif
+ }
+ template <typename T>
+@@ -3739,7 +3845,7 @@ HWY_INLINE size_t CountTrue(hwy::SizeTag
+ #else
+   const int32x4_t x2 = vpaddlq_s16(ones);
+   const int64x2_t x4 = vpaddlq_s32(x2);
+-  return x4[0] + x4[1];
++  return vgetq_lane_s64(x4, 0) + vgetq_lane_s64(x4, 1);
+ #endif
+ }
+ 
+@@ -3753,7 +3859,7 @@ HWY_INLINE size_t CountTrue(hwy::SizeTag
+   return vaddvq_s32(ones);
+ #else
+   const int64x2_t x2 = vpaddlq_s32(ones);
+-  return x2[0] + x2[1];
++  return vgetq_lane_s64(x2, 0) + vgetq_lane_s64(x2, 1);
+ #endif
+ }
+ 
+@@ -3765,10 +3871,10 @@ HWY_INLINE size_t CountTrue(hwy::SizeTag
+       vnegq_s64(BitCast(di, VecFromMask(Full128<T>(), mask)).raw);
+   return vaddvq_s64(ones);
+ #else
+-  const Full128<int64_t> di;
+-  const int64x2_t ones =
+-      vshrq_n_u64(BitCast(di, VecFromMask(Full128<T>(), mask)).raw, 63);
+-  return ones[0] + ones[1];
++  const Full128<uint64_t> du;
++  const auto mask_u = VecFromMask(du, RebindMask(du, mask));
++  const uint64x2_t ones = vshrq_n_u64(mask_u.raw, 63);
++  return vgetq_lane_u64(ones, 0) + vgetq_lane_u64(ones, 1);
+ #endif
+ }
+ 
+@@ -3798,11 +3904,13 @@ HWY_INLINE size_t StoreMaskBits(const Ma
+ template <typename T>
+ HWY_INLINE bool AllFalse(const Mask128<T> m) {
+ #if HWY_ARCH_ARM_A64
+-  return (vmaxvq_u32(m.raw) == 0);
++  const Full128<uint32_t> d32;
++  const auto m32 = MaskFromVec(BitCast(d32, VecFromMask(Full128<T>(), m)));
++  return (vmaxvq_u32(m32.raw) == 0);
+ #else
+   const auto v64 = BitCast(Full128<uint64_t>(), VecFromMask(Full128<T>(), m));
+   uint32x2_t a = vqmovn_u64(v64.raw);
+-  return vreinterpret_u64_u32(a)[0] == 0;
++  return vget_lane_u64(vreinterpret_u64_u32(a), 0) == 0;
+ #endif
+ }
+ 
+@@ -4178,6 +4286,7 @@ HWY_API auto Le(V a, V b) -> decltype(a
+   return a <= b;
+ }
+ 
++namespace detail {  // for code folding
+ #if HWY_ARCH_ARM_V7
+ #undef vuzp1_s8
+ #undef vuzp1_u8
+@@ -4265,6 +4374,7 @@ HWY_API auto Le(V a, V b) -> decltype(a
+ #undef HWY_NEON_DEF_FUNCTION_UINT_8_16_32
+ #undef HWY_NEON_DEF_FUNCTION_UINTS
+ #undef HWY_NEON_EVAL
++}  // namespace detail
+ 
+ // NOLINTNEXTLINE(google-readability-namespace-comments)
+ }  // namespace HWY_NAMESPACE
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/ops/rvv-inl.h.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/ops/rvv-inl.h
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/ops/rvv-inl.h.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/ops/rvv-inl.h	2021-07-26 17:10:30.290171587 -0400
+@@ -39,6 +39,11 @@ using TFromV = TFromD<DFromV<V>>;
+   hwy::EnableIf<IsSigned<TFromV<V>>() && !IsFloat<TFromV<V>>()>* = nullptr
+ #define HWY_IF_FLOAT_V(V) hwy::EnableIf<IsFloat<TFromV<V>>()>* = nullptr
+ 
++// kShift = log2 of multiplier: 0 for m1, 1 for m2, -2 for mf4
++template <typename T, int kShift = 0>
++using Full = Simd<T, (kShift < 0) ? (HWY_LANES(T) >> (-kShift))
++                                  : (HWY_LANES(T) << kShift)>;
++
+ // ================================================== MACROS
+ 
+ // Generate specializations and function definitions using X macros. Although
+@@ -58,29 +63,30 @@ namespace detail {  // for code folding
+ 
+ // For given SEW, iterate over all LMUL. Precompute SEW/LMUL => MLEN because the
+ // preprocessor cannot easily do it.
+-#define HWY_RVV_FOREACH_08(X_MACRO, BASE, CHAR, NAME, OP) \
+-  X_MACRO(BASE, CHAR, 8, 1, 8, NAME, OP)                  \
+-  X_MACRO(BASE, CHAR, 8, 2, 4, NAME, OP)                  \
+-  X_MACRO(BASE, CHAR, 8, 4, 2, NAME, OP)                  \
+-  X_MACRO(BASE, CHAR, 8, 8, 1, NAME, OP)
+-
+-#define HWY_RVV_FOREACH_16(X_MACRO, BASE, CHAR, NAME, OP) \
+-  X_MACRO(BASE, CHAR, 16, 1, 16, NAME, OP)                \
+-  X_MACRO(BASE, CHAR, 16, 2, 8, NAME, OP)                 \
+-  X_MACRO(BASE, CHAR, 16, 4, 4, NAME, OP)                 \
+-  X_MACRO(BASE, CHAR, 16, 8, 2, NAME, OP)
+-
+-#define HWY_RVV_FOREACH_32(X_MACRO, BASE, CHAR, NAME, OP) \
+-  X_MACRO(BASE, CHAR, 32, 1, 32, NAME, OP)                \
+-  X_MACRO(BASE, CHAR, 32, 2, 16, NAME, OP)                \
+-  X_MACRO(BASE, CHAR, 32, 4, 8, NAME, OP)                 \
+-  X_MACRO(BASE, CHAR, 32, 8, 4, NAME, OP)
+-
+-#define HWY_RVV_FOREACH_64(X_MACRO, BASE, CHAR, NAME, OP) \
+-  X_MACRO(BASE, CHAR, 64, 1, 64, NAME, OP)                \
+-  X_MACRO(BASE, CHAR, 64, 2, 32, NAME, OP)                \
+-  X_MACRO(BASE, CHAR, 64, 4, 16, NAME, OP)                \
+-  X_MACRO(BASE, CHAR, 64, 8, 8, NAME, OP)
++// TODO(janwas): GCC does not yet support fractional LMUL
++#define HWY_RVV_FOREACH_08(X_MACRO, BASE, CHAR, NAME, OP)        \
++  X_MACRO(BASE, CHAR, 8, m1, /*kShift=*/0, /*MLEN=*/8, NAME, OP) \
++  X_MACRO(BASE, CHAR, 8, m2, /*kShift=*/1, /*MLEN=*/4, NAME, OP) \
++  X_MACRO(BASE, CHAR, 8, m4, /*kShift=*/2, /*MLEN=*/2, NAME, OP) \
++  X_MACRO(BASE, CHAR, 8, m8, /*kShift=*/3, /*MLEN=*/1, NAME, OP)
++
++#define HWY_RVV_FOREACH_16(X_MACRO, BASE, CHAR, NAME, OP)          \
++  X_MACRO(BASE, CHAR, 16, m1, /*kShift=*/0, /*MLEN=*/16, NAME, OP) \
++  X_MACRO(BASE, CHAR, 16, m2, /*kShift=*/1, /*MLEN=*/8, NAME, OP)  \
++  X_MACRO(BASE, CHAR, 16, m4, /*kShift=*/2, /*MLEN=*/4, NAME, OP)  \
++  X_MACRO(BASE, CHAR, 16, m8, /*kShift=*/3, /*MLEN=*/2, NAME, OP)
++
++#define HWY_RVV_FOREACH_32(X_MACRO, BASE, CHAR, NAME, OP)          \
++  X_MACRO(BASE, CHAR, 32, m1, /*kShift=*/0, /*MLEN=*/32, NAME, OP) \
++  X_MACRO(BASE, CHAR, 32, m2, /*kShift=*/1, /*MLEN=*/16, NAME, OP) \
++  X_MACRO(BASE, CHAR, 32, m4, /*kShift=*/2, /*MLEN=*/8, NAME, OP)  \
++  X_MACRO(BASE, CHAR, 32, m8, /*kShift=*/3, /*MLEN=*/4, NAME, OP)
++
++#define HWY_RVV_FOREACH_64(X_MACRO, BASE, CHAR, NAME, OP)          \
++  X_MACRO(BASE, CHAR, 64, m1, /*kShift=*/0, /*MLEN=*/64, NAME, OP) \
++  X_MACRO(BASE, CHAR, 64, m2, /*kShift=*/1, /*MLEN=*/32, NAME, OP) \
++  X_MACRO(BASE, CHAR, 64, m4, /*kShift=*/2, /*MLEN=*/16, NAME, OP) \
++  X_MACRO(BASE, CHAR, 64, m8, /*kShift=*/3, /*MLEN=*/8, NAME, OP)
+ 
+ // SEW for unsigned:
+ #define HWY_RVV_FOREACH_U08(X_MACRO, NAME, OP) \
+@@ -153,63 +159,61 @@ namespace detail {  // for code folding
+ 
+ // Assemble types for use in x-macros
+ #define HWY_RVV_T(BASE, SEW) BASE##SEW##_t
+-#define HWY_RVV_D(CHAR, SEW, LMUL) D##CHAR##SEW##m##LMUL
+-#define HWY_RVV_V(BASE, SEW, LMUL) v##BASE##SEW##m##LMUL##_t
++#define HWY_RVV_D(CHAR, SEW, LMUL) D##CHAR##SEW##LMUL
++#define HWY_RVV_V(BASE, SEW, LMUL) v##BASE##SEW##LMUL##_t
+ #define HWY_RVV_M(MLEN) vbool##MLEN##_t
+ 
+ }  // namespace detail
+ 
+ // TODO(janwas): remove typedefs and only use HWY_RVV_V etc. directly
+ 
+-// TODO(janwas): do we want fractional LMUL? (can encode as negative)
+-// Mixed-precision code can use LMUL 1..8 and that should be enough unless they
+-// need many registers.
+-#define HWY_SPECIALIZE(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)             \
+-  using HWY_RVV_D(CHAR, SEW, LMUL) =                                      \
+-      Simd<HWY_RVV_T(BASE, SEW), HWY_LANES(HWY_RVV_T(BASE, SEW)) * LMUL>; \
+-  using V##CHAR##SEW##m##LMUL = HWY_RVV_V(BASE, SEW, LMUL);               \
+-  template <>                                                             \
+-  struct DFromV_t<HWY_RVV_V(BASE, SEW, LMUL)> {                           \
+-    using Lane = HWY_RVV_T(BASE, SEW);                                    \
+-    using type = Simd<Lane, HWY_LANES(Lane) * LMUL>;                      \
++// Until we have full intrinsic support for fractional LMUL, mixed-precision
++// code can use LMUL 1..8 (adequate unless they need many registers).
++#define HWY_SPECIALIZE(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)    \
++  using HWY_RVV_D(CHAR, SEW, LMUL) = Full<HWY_RVV_T(BASE, SEW), SHIFT>; \
++  using V##CHAR##SEW##LMUL = HWY_RVV_V(BASE, SEW, LMUL);                \
++  template <>                                                           \
++  struct DFromV_t<HWY_RVV_V(BASE, SEW, LMUL)> {                         \
++    using Lane = HWY_RVV_T(BASE, SEW);                                  \
++    using type = Full<Lane, SHIFT>;                                     \
+   };
+ using Vf16m1 = vfloat16m1_t;
+ using Vf16m2 = vfloat16m2_t;
+ using Vf16m4 = vfloat16m4_t;
+ using Vf16m8 = vfloat16m8_t;
+-using Df16m1 = Simd<float16_t, HWY_LANES(uint16_t) * 1>;
+-using Df16m2 = Simd<float16_t, HWY_LANES(uint16_t) * 2>;
+-using Df16m4 = Simd<float16_t, HWY_LANES(uint16_t) * 4>;
+-using Df16m8 = Simd<float16_t, HWY_LANES(uint16_t) * 8>;
++using Df16m1 = Full<float16_t, 0>;
++using Df16m2 = Full<float16_t, 1>;
++using Df16m4 = Full<float16_t, 2>;
++using Df16m8 = Full<float16_t, 3>;
+ 
+ HWY_RVV_FOREACH(HWY_SPECIALIZE, _, _)
+ #undef HWY_SPECIALIZE
+ 
+ // vector = f(d), e.g. Zero
+-#define HWY_RVV_RETV_ARGD(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)          \
++#define HWY_RVV_RETV_ARGD(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)   \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL) NAME(HWY_RVV_D(CHAR, SEW, LMUL) d) { \
+     (void)Lanes(d);                                                       \
+-    return v##OP##_##CHAR##SEW##m##LMUL();                                \
++    return v##OP##_##CHAR##SEW##LMUL();                                   \
+   }
+ 
+ // vector = f(vector), e.g. Not
+-#define HWY_RVV_RETV_ARGV(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)          \
++#define HWY_RVV_RETV_ARGV(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)   \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL) NAME(HWY_RVV_V(BASE, SEW, LMUL) v) { \
+-    return v##OP##_v_##CHAR##SEW##m##LMUL(v);                             \
++    return v##OP##_v_##CHAR##SEW##LMUL(v);                                \
+   }
+ 
+ // vector = f(vector, scalar), e.g. detail::Add
+-#define HWY_RVV_RETV_ARGVS(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)  \
+-  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                               \
+-      NAME(HWY_RVV_V(BASE, SEW, LMUL) a, HWY_RVV_T(BASE, SEW) b) { \
+-    return v##OP##_##CHAR##SEW##m##LMUL(a, b);                     \
++#define HWY_RVV_RETV_ARGVS(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP) \
++  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                     \
++      NAME(HWY_RVV_V(BASE, SEW, LMUL) a, HWY_RVV_T(BASE, SEW) b) {       \
++    return v##OP##_##CHAR##SEW##LMUL(a, b);                              \
+   }
+ 
+ // vector = f(vector, vector), e.g. Add
+-#define HWY_RVV_RETV_ARGVV(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)        \
++#define HWY_RVV_RETV_ARGVV(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP) \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                     \
+       NAME(HWY_RVV_V(BASE, SEW, LMUL) a, HWY_RVV_V(BASE, SEW, LMUL) b) { \
+-    return v##OP##_vv_##CHAR##SEW##m##LMUL(a, b);                        \
++    return v##OP##_vv_##CHAR##SEW##LMUL(a, b);                           \
+   }
+ 
+ // ================================================== INIT
+@@ -218,9 +222,9 @@ HWY_RVV_FOREACH(HWY_SPECIALIZE, _, _)
+ 
+ // WARNING: we want to query VLMAX/sizeof(T), but this actually changes VL!
+ // vlenb is not exposed through intrinsics and vreadvl is not VLMAX.
+-#define HWY_RVV_LANES(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP) \
+-  HWY_API size_t NAME(HWY_RVV_D(CHAR, SEW, LMUL) /* d */) {  \
+-    return v##OP##SEW##m##LMUL();                            \
++#define HWY_RVV_LANES(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP) \
++  HWY_API size_t NAME(HWY_RVV_D(CHAR, SEW, LMUL) /* d */) {         \
++    return v##OP##SEW##LMUL();                                      \
+   }
+ 
+ HWY_RVV_FOREACH(HWY_RVV_LANES, Lanes, setvlmax_e)
+@@ -233,19 +237,31 @@ HWY_RVV_FOREACH(HWY_RVV_RETV_ARGD, Zero,
+ template <class D>
+ using VFromD = decltype(Zero(D()));
+ 
++// Partial
++template <typename T, size_t N, HWY_IF_LE128(T, N)>
++HWY_API VFromD<Full<T>> Zero(Simd<T, N> /*tag*/) {
++  return Zero(Full<T>());
++}
++
+ // ------------------------------ Set
+ // vector = f(d, scalar), e.g. Set
+-#define HWY_RVV_SET(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)           \
++#define HWY_RVV_SET(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)    \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                 \
+       NAME(HWY_RVV_D(CHAR, SEW, LMUL) d, HWY_RVV_T(BASE, SEW) arg) { \
+     (void)Lanes(d);                                                  \
+-    return v##OP##_##CHAR##SEW##m##LMUL(arg);                        \
++    return v##OP##_##CHAR##SEW##LMUL(arg);                           \
+   }
+ 
+ HWY_RVV_FOREACH_UI(HWY_RVV_SET, Set, mv_v_x)
+ HWY_RVV_FOREACH_F(HWY_RVV_SET, Set, fmv_v_f)
+ #undef HWY_RVV_SET
+ 
++// Partial vectors
++template <typename T, size_t N, HWY_IF_LE128(T, N)>
++HWY_API VFromD<Simd<T, N>> Set(Simd<T, N> /*tag*/, T arg) {
++  return Set(Full<T>(), arg);
++}
++
+ // ------------------------------ Undefined
+ 
+ // RVV vundefined is 'poisoned' such that even XORing a _variable_ initialized
+@@ -265,7 +281,7 @@ HWY_API VFromD<D> Undefined(D d) {
+ namespace detail {
+ 
+ // u8: no change
+-#define HWY_RVV_CAST_NOP(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)           \
++#define HWY_RVV_CAST_NOP(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)    \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                      \
+       BitCastToByte(HWY_RVV_V(BASE, SEW, LMUL) v) {                       \
+     return v;                                                             \
+@@ -276,25 +292,25 @@ namespace detail {
+   }
+ 
+ // Other integers
+-#define HWY_RVV_CAST_UI(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)            \
+-  HWY_API vuint8m##LMUL##_t BitCastToByte(HWY_RVV_V(BASE, SEW, LMUL) v) { \
+-    return v##OP##_v_##CHAR##SEW##m##LMUL##_u8m##LMUL(v);                 \
+-  }                                                                       \
+-  HWY_API HWY_RVV_V(BASE, SEW, LMUL) BitCastFromByte(                     \
+-      HWY_RVV_D(CHAR, SEW, LMUL) /* d */, vuint8m##LMUL##_t v) {          \
+-    return v##OP##_v_u8m##LMUL##_##CHAR##SEW##m##LMUL(v);                 \
++#define HWY_RVV_CAST_UI(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)    \
++  HWY_API vuint8##LMUL##_t BitCastToByte(HWY_RVV_V(BASE, SEW, LMUL) v) { \
++    return v##OP##_v_##CHAR##SEW##LMUL##_u8##LMUL(v);                    \
++  }                                                                      \
++  HWY_API HWY_RVV_V(BASE, SEW, LMUL) BitCastFromByte(                    \
++      HWY_RVV_D(CHAR, SEW, LMUL) /* d */, vuint8##LMUL##_t v) {          \
++    return v##OP##_v_u8##LMUL##_##CHAR##SEW##LMUL(v);                    \
+   }
+ 
+ // Float: first cast to/from unsigned
+-#define HWY_RVV_CAST_F(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)             \
+-  HWY_API vuint8m##LMUL##_t BitCastToByte(HWY_RVV_V(BASE, SEW, LMUL) v) { \
+-    return v##OP##_v_u##SEW##m##LMUL##_u8m##LMUL(                         \
+-        v##OP##_v_f##SEW##m##LMUL##_u##SEW##m##LMUL(v));                  \
+-  }                                                                       \
+-  HWY_API HWY_RVV_V(BASE, SEW, LMUL) BitCastFromByte(                     \
+-      HWY_RVV_D(CHAR, SEW, LMUL) /* d */, vuint8m##LMUL##_t v) {          \
+-    return v##OP##_v_u##SEW##m##LMUL##_f##SEW##m##LMUL(                   \
+-        v##OP##_v_u8m##LMUL##_u##SEW##m##LMUL(v));                        \
++#define HWY_RVV_CAST_F(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)     \
++  HWY_API vuint8##LMUL##_t BitCastToByte(HWY_RVV_V(BASE, SEW, LMUL) v) { \
++    return v##OP##_v_u##SEW##LMUL##_u8##LMUL(                            \
++        v##OP##_v_f##SEW##LMUL##_u##SEW##LMUL(v));                       \
++  }                                                                      \
++  HWY_API HWY_RVV_V(BASE, SEW, LMUL) BitCastFromByte(                    \
++      HWY_RVV_D(CHAR, SEW, LMUL) /* d */, vuint8##LMUL##_t v) {          \
++    return v##OP##_v_u##SEW##LMUL##_f##SEW##LMUL(                        \
++        v##OP##_v_u8##LMUL##_u##SEW##LMUL(v));                           \
+   }
+ 
+ HWY_RVV_FOREACH_U08(HWY_RVV_CAST_NOP, _, _)
+@@ -315,6 +331,12 @@ HWY_API VFromD<D> BitCast(D d, FromV v)
+   return detail::BitCastFromByte(d, detail::BitCastToByte(v));
+ }
+ 
++// Partial
++template <typename T, size_t N, class FromV, HWY_IF_LE128(T, N)>
++HWY_API VFromD<Simd<T, N>> BitCast(Simd<T, N> /*tag*/, FromV v) {
++  return BitCast(Full<T>(), v);
++}
++
+ namespace detail {
+ 
+ template <class V, class DU = RebindToUnsigned<DFromV<V>>>
+@@ -336,6 +358,12 @@ HWY_API VFromD<DU> Iota0(const D /*d*/)
+   return BitCastToUnsigned(Iota0(DU()));
+ }
+ 
++// Partial
++template <typename T, size_t N, HWY_IF_LE128(T, N)>
++HWY_API VFromD<Simd<T, N>> Iota0(Simd<T, N> /*tag*/) {
++  return Iota0(Full<T>());
++}
++
+ }  // namespace detail
+ 
+ // ================================================== LOGICAL
+@@ -370,11 +398,11 @@ HWY_API V And(const V a, const V b) {
+ // ------------------------------ Or
+ 
+ // Scalar argument plus mask. Used by VecFromMask.
+-#define HWY_RVV_OR_MASK(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)           \
++#define HWY_RVV_OR_MASK(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)    \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                     \
+       NAME(HWY_RVV_V(BASE, SEW, LMUL) v, HWY_RVV_T(BASE, SEW) imm,       \
+            HWY_RVV_M(MLEN) mask, HWY_RVV_V(BASE, SEW, LMUL) maskedoff) { \
+-    return v##OP##_##CHAR##SEW##m##LMUL##_m(mask, maskedoff, v, imm);    \
++    return v##OP##_##CHAR##SEW##LMUL##_m(mask, maskedoff, v, imm);       \
+   }
+ 
+ namespace detail {
+@@ -466,14 +494,14 @@ HWY_RVV_FOREACH_U16(HWY_RVV_RETV_ARGVV,
+ // ------------------------------ ShiftLeft[Same]
+ 
+ // Intrinsics do not define .vi forms, so use .vx instead.
+-#define HWY_RVV_SHIFT(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)               \
+-  template <int kBits>                                                     \
+-  HWY_API HWY_RVV_V(BASE, SEW, LMUL) NAME(HWY_RVV_V(BASE, SEW, LMUL) v) {  \
+-    return v##OP##_vx_##CHAR##SEW##m##LMUL(v, kBits);                      \
+-  }                                                                        \
+-  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                       \
+-      NAME##Same(HWY_RVV_V(BASE, SEW, LMUL) v, int bits) {                 \
+-    return v##OP##_vx_##CHAR##SEW##m##LMUL(v, static_cast<uint8_t>(bits)); \
++#define HWY_RVV_SHIFT(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)       \
++  template <int kBits>                                                    \
++  HWY_API HWY_RVV_V(BASE, SEW, LMUL) NAME(HWY_RVV_V(BASE, SEW, LMUL) v) { \
++    return v##OP##_vx_##CHAR##SEW##LMUL(v, kBits);                        \
++  }                                                                       \
++  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                      \
++      NAME##Same(HWY_RVV_V(BASE, SEW, LMUL) v, int bits) {                \
++    return v##OP##_vx_##CHAR##SEW##LMUL(v, static_cast<uint8_t>(bits));   \
+   }
+ 
+ HWY_RVV_FOREACH_UI(HWY_RVV_SHIFT, ShiftLeft, sll)
+@@ -486,19 +514,18 @@ HWY_RVV_FOREACH_I(HWY_RVV_SHIFT, ShiftRi
+ #undef HWY_RVV_SHIFT
+ 
+ // ------------------------------ Shl
+-#define HWY_RVV_SHIFT_VV(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)             \
++#define HWY_RVV_SHIFT_VV(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)      \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                        \
+       NAME(HWY_RVV_V(BASE, SEW, LMUL) v, HWY_RVV_V(BASE, SEW, LMUL) bits) { \
+-    return v##OP##_vv_##CHAR##SEW##m##LMUL(v, bits);                        \
++    return v##OP##_vv_##CHAR##SEW##LMUL(v, bits);                           \
+   }
+ 
+ HWY_RVV_FOREACH_U(HWY_RVV_SHIFT_VV, Shl, sll)
+ 
+-#define HWY_RVV_SHIFT_II(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)              \
++#define HWY_RVV_SHIFT_II(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)       \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                         \
+       NAME(HWY_RVV_V(BASE, SEW, LMUL) v, HWY_RVV_V(BASE, SEW, LMUL) bits) {  \
+-    return v##OP##_vv_##CHAR##SEW##m##LMUL(v,                                \
+-                                           detail::BitCastToUnsigned(bits)); \
++    return v##OP##_vv_##CHAR##SEW##LMUL(v, detail::BitCastToUnsigned(bits)); \
+   }
+ 
+ HWY_RVV_FOREACH_I(HWY_RVV_SHIFT_II, Shl, sll)
+@@ -569,11 +596,11 @@ HWY_API V ApproximateReciprocalSqrt(cons
+ 
+ // ------------------------------ MulAdd
+ // Note: op is still named vv, not vvv.
+-#define HWY_RVV_FMA(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)               \
++#define HWY_RVV_FMA(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)        \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                     \
+       NAME(HWY_RVV_V(BASE, SEW, LMUL) mul, HWY_RVV_V(BASE, SEW, LMUL) x, \
+            HWY_RVV_V(BASE, SEW, LMUL) add) {                             \
+-    return v##OP##_vv_##CHAR##SEW##m##LMUL(add, mul, x);                 \
++    return v##OP##_vv_##CHAR##SEW##LMUL(add, mul, x);                    \
+   }
+ 
+ HWY_RVV_FOREACH_F(HWY_RVV_FMA, MulAdd, fmacc)
+@@ -596,11 +623,11 @@ HWY_RVV_FOREACH_F(HWY_RVV_FMA, NegMulSub
+ // of all bits; SLEN 8 / LMUL 4 = half of all bits.
+ 
+ // mask = f(vector, vector)
+-#define HWY_RVV_RETM_ARGVV(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)        \
++#define HWY_RVV_RETM_ARGVV(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP) \
+   HWY_API HWY_RVV_M(MLEN)                                                \
+       NAME(HWY_RVV_V(BASE, SEW, LMUL) a, HWY_RVV_V(BASE, SEW, LMUL) b) { \
+     (void)Lanes(DFromV<decltype(a)>());                                  \
+-    return v##OP##_vv_##CHAR##SEW##m##LMUL##_b##MLEN(a, b);              \
++    return v##OP##_vv_##CHAR##SEW##LMUL##_b##MLEN(a, b);                 \
+   }
+ 
+ // ------------------------------ Eq
+@@ -675,11 +702,11 @@ HWY_RVV_FOREACH_B(HWY_RVV_RETM_ARGMM, Xo
+ #undef HWY_RVV_RETM_ARGMM
+ 
+ // ------------------------------ IfThenElse
+-#define HWY_RVV_IF_THEN_ELSE(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP) \
+-  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                \
+-      NAME(HWY_RVV_M(MLEN) m, HWY_RVV_V(BASE, SEW, LMUL) yes,       \
+-           HWY_RVV_V(BASE, SEW, LMUL) no) {                         \
+-    return v##OP##_vvm_##CHAR##SEW##m##LMUL(m, no, yes);            \
++#define HWY_RVV_IF_THEN_ELSE(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP) \
++  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                       \
++      NAME(HWY_RVV_M(MLEN) m, HWY_RVV_V(BASE, SEW, LMUL) yes,              \
++           HWY_RVV_V(BASE, SEW, LMUL) no) {                                \
++    return v##OP##_vvm_##CHAR##SEW##LMUL(m, no, yes);                      \
+   }
+ 
+ HWY_RVV_FOREACH(HWY_RVV_IF_THEN_ELSE, IfThenElse, merge)
+@@ -774,17 +801,17 @@ HWY_RVV_FOREACH_B(HWY_RVV_COUNT_TRUE, _,
+ 
+ // ------------------------------ Load
+ 
+-#define HWY_RVV_LOAD(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP) \
+-  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                        \
+-      NAME(HWY_RVV_D(CHAR, SEW, LMUL) d,                    \
+-           const HWY_RVV_T(BASE, SEW) * HWY_RESTRICT p) {   \
+-    (void)Lanes(d);                                         \
+-    return v##OP##SEW##_v_##CHAR##SEW##m##LMUL(p);          \
++#define HWY_RVV_LOAD(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP) \
++  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                               \
++      NAME(HWY_RVV_D(CHAR, SEW, LMUL) d,                           \
++           const HWY_RVV_T(BASE, SEW) * HWY_RESTRICT p) {          \
++    (void)Lanes(d);                                                \
++    return v##OP##SEW##_v_##CHAR##SEW##LMUL(p);                    \
+   }
+ HWY_RVV_FOREACH(HWY_RVV_LOAD, Load, le)
+ #undef HWY_RVV_LOAD
+ 
+-// Partial load
++// Partial
+ template <typename T, size_t N, HWY_IF_LE128(T, N)>
+ HWY_API VFromD<Simd<T, N>> Load(Simd<T, N> d, const T* HWY_RESTRICT p) {
+   return Load(d, p);
+@@ -800,16 +827,22 @@ HWY_API VFromD<D> LoadU(D d, const TFrom
+ 
+ // ------------------------------ Store
+ 
+-#define HWY_RVV_RET_ARGVDP(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP) \
+-  HWY_API void NAME(HWY_RVV_V(BASE, SEW, LMUL) v,                 \
+-                    HWY_RVV_D(CHAR, SEW, LMUL) d,                 \
+-                    HWY_RVV_T(BASE, SEW) * HWY_RESTRICT p) {      \
+-    (void)Lanes(d);                                               \
+-    return v##OP##SEW##_v_##CHAR##SEW##m##LMUL(p, v);             \
++#define HWY_RVV_RET_ARGVDP(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP) \
++  HWY_API void NAME(HWY_RVV_V(BASE, SEW, LMUL) v,                        \
++                    HWY_RVV_D(CHAR, SEW, LMUL) d,                        \
++                    HWY_RVV_T(BASE, SEW) * HWY_RESTRICT p) {             \
++    (void)Lanes(d);                                                      \
++    return v##OP##SEW##_v_##CHAR##SEW##LMUL(p, v);                       \
+   }
+ HWY_RVV_FOREACH(HWY_RVV_RET_ARGVDP, Store, se)
+ #undef HWY_RVV_RET_ARGVDP
+ 
++// Partial
++template <typename T, size_t N, HWY_IF_LE128(T, N)>
++HWY_API void Store(VFromD<Simd<T, N>> v, Simd<T, N> d, T* HWY_RESTRICT p) {
++  return Store(v, Full<T>(), p);
++}
++
+ // ------------------------------ StoreU
+ 
+ // RVV only requires lane alignment, not natural alignment of the entire vector.
+@@ -963,67 +996,6 @@ HWY_API VFromD<Simd<int32_t, N>> Promote
+   return BitCast(d, PromoteTo(Simd<uint32_t, N>(), v));
+ }
+ 
+-// ------------------------------ PromoteTo I
+-
+-HWY_API Vi16m2 PromoteTo(Di16m2 /* d */, Vi8m1 v) { return vsext_vf2_i16m2(v); }
+-HWY_API Vi16m4 PromoteTo(Di16m4 /* d */, Vi8m2 v) { return vsext_vf2_i16m4(v); }
+-HWY_API Vi16m8 PromoteTo(Di16m8 /* d */, Vi8m4 v) { return vsext_vf2_i16m8(v); }
+-
+-HWY_API Vi32m4 PromoteTo(Di32m4 /* d */, Vi8m1 v) { return vsext_vf4_i32m4(v); }
+-HWY_API Vi32m8 PromoteTo(Di32m8 /* d */, Vi8m2 v) { return vsext_vf4_i32m8(v); }
+-
+-HWY_API Vi32m2 PromoteTo(Di32m2 /* d */, const Vi16m1 v) {
+-  return vsext_vf2_i32m2(v);
+-}
+-HWY_API Vi32m4 PromoteTo(Di32m4 /* d */, const Vi16m2 v) {
+-  return vsext_vf2_i32m4(v);
+-}
+-HWY_API Vi32m8 PromoteTo(Di32m8 /* d */, const Vi16m4 v) {
+-  return vsext_vf2_i32m8(v);
+-}
+-
+-HWY_API Vi64m2 PromoteTo(Di64m2 /* d */, const Vi32m1 v) {
+-  return vsext_vf2_i64m2(v);
+-}
+-HWY_API Vi64m4 PromoteTo(Di64m4 /* d */, const Vi32m2 v) {
+-  return vsext_vf2_i64m4(v);
+-}
+-HWY_API Vi64m8 PromoteTo(Di64m8 /* d */, const Vi32m4 v) {
+-  return vsext_vf2_i64m8(v);
+-}
+-
+-// ------------------------------ PromoteTo F
+-
+-HWY_API Vf32m2 PromoteTo(Df32m2 /* d */, const Vf16m1 v) {
+-  return vfwcvt_f_f_v_f32m2(v);
+-}
+-HWY_API Vf32m4 PromoteTo(Df32m4 /* d */, const Vf16m2 v) {
+-  return vfwcvt_f_f_v_f32m4(v);
+-}
+-HWY_API Vf32m8 PromoteTo(Df32m8 /* d */, const Vf16m4 v) {
+-  return vfwcvt_f_f_v_f32m8(v);
+-}
+-
+-HWY_API Vf64m2 PromoteTo(Df64m2 /* d */, const Vf32m1 v) {
+-  return vfwcvt_f_f_v_f64m2(v);
+-}
+-HWY_API Vf64m4 PromoteTo(Df64m4 /* d */, const Vf32m2 v) {
+-  return vfwcvt_f_f_v_f64m4(v);
+-}
+-HWY_API Vf64m8 PromoteTo(Df64m8 /* d */, const Vf32m4 v) {
+-  return vfwcvt_f_f_v_f64m8(v);
+-}
+-
+-HWY_API Vf64m2 PromoteTo(Df64m2 /* d */, const Vi32m1 v) {
+-  return vfwcvt_f_x_v_f64m2(v);
+-}
+-HWY_API Vf64m4 PromoteTo(Df64m4 /* d */, const Vi32m2 v) {
+-  return vfwcvt_f_x_v_f64m4(v);
+-}
+-HWY_API Vf64m8 PromoteTo(Df64m8 /* d */, const Vi32m4 v) {
+-  return vfwcvt_f_x_v_f64m8(v);
+-}
+-
+ // ------------------------------ DemoteTo U
+ 
+ // First clamp negative numbers to zero to match x86 packus.
+@@ -1124,19 +1096,19 @@ HWY_API Vi32m4 DemoteTo(Di32m4 /* d */,
+ 
+ // ------------------------------ ConvertTo F
+ 
+-#define HWY_RVV_CONVERT(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)                 \
++#define HWY_RVV_CONVERT(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)          \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL) ConvertTo(                                \
+       HWY_RVV_D(CHAR, SEW, LMUL) /* d */, HWY_RVV_V(int, SEW, LMUL) v) {       \
+-    return vfcvt_f_x_v_f##SEW##m##LMUL(v);                                     \
++    return vfcvt_f_x_v_f##SEW##LMUL(v);                                        \
+   }                                                                            \
+   /* Truncates (rounds toward zero). */                                        \
+   HWY_API HWY_RVV_V(int, SEW, LMUL) ConvertTo(HWY_RVV_D(i, SEW, LMUL) /* d */, \
+                                               HWY_RVV_V(BASE, SEW, LMUL) v) {  \
+-    return vfcvt_rtz_x_f_v_i##SEW##m##LMUL(v);                                 \
++    return vfcvt_rtz_x_f_v_i##SEW##LMUL(v);                                    \
+   }                                                                            \
+   /* Uses default rounding mode. */                                            \
+   HWY_API HWY_RVV_V(int, SEW, LMUL) NearestInt(HWY_RVV_V(BASE, SEW, LMUL) v) { \
+-    return vfcvt_x_f_v_i##SEW##m##LMUL(v);                                     \
++    return vfcvt_x_f_v_i##SEW##LMUL(v);                                        \
+   }
+ 
+ // API only requires f32 but we provide f64 for internal use (otherwise, it
+@@ -1184,10 +1156,10 @@ HWY_API VFromD<DU> SetTableIndices(D d,
+ 
+ // <32bit are not part of Highway API, but used in Broadcast. This limits VLMAX
+ // to 2048! We could instead use vrgatherei16.
+-#define HWY_RVV_TABLE(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)               \
++#define HWY_RVV_TABLE(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)        \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                       \
+       NAME(HWY_RVV_V(BASE, SEW, LMUL) v, HWY_RVV_V(uint, SEW, LMUL) idx) { \
+-    return v##OP##_vv_##CHAR##SEW##m##LMUL(v, idx);                        \
++    return v##OP##_vv_##CHAR##SEW##LMUL(v, idx);                           \
+   }
+ 
+ HWY_RVV_FOREACH(HWY_RVV_TABLE, TableLookupLanes, rgather)
+@@ -1279,7 +1251,6 @@ HWY_API V OffsetsOf128BitBlocks(const D
+   using T = MakeUnsigned<TFromD<D>>;
+   return detail::And(iota0, static_cast<T>(~(LanesPerBlock(d) - 1)));
+ }
+-
+ }  // namespace detail
+ 
+ template <class V>
+@@ -1307,9 +1278,9 @@ HWY_API V Broadcast(const V v) {
+ 
+ // ------------------------------ GetLane
+ 
+-#define HWY_RVV_GET_LANE(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)     \
+-  HWY_API HWY_RVV_T(BASE, SEW) NAME(HWY_RVV_V(BASE, SEW, LMUL) v) { \
+-    return v##OP##_s_##CHAR##SEW##m##LMUL##_##CHAR##SEW(v);         \
++#define HWY_RVV_GET_LANE(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP) \
++  HWY_API HWY_RVV_T(BASE, SEW) NAME(HWY_RVV_V(BASE, SEW, LMUL) v) {    \
++    return v##OP##_s_##CHAR##SEW##LMUL##_##CHAR##SEW(v);               \
+   }
+ 
+ HWY_RVV_FOREACH_UI(HWY_RVV_GET_LANE, GetLane, mv_x)
+@@ -1318,11 +1289,12 @@ HWY_RVV_FOREACH_F(HWY_RVV_GET_LANE, GetL
+ 
+ // ------------------------------ ShiftLeftLanes
+ 
+-// vector = f(vector, size_t)
+-#define HWY_RVV_SLIDE(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP) \
+-  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                         \
+-      NAME(HWY_RVV_V(BASE, SEW, LMUL) v, size_t lanes) {     \
+-    return v##OP##_vx_##CHAR##SEW##m##LMUL(v, v, lanes);     \
++// vector = f(vector, vector, size_t)
++#define HWY_RVV_SLIDE(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)        \
++  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                       \
++      NAME(HWY_RVV_V(BASE, SEW, LMUL) dst, HWY_RVV_V(BASE, SEW, LMUL) src, \
++           size_t lanes) {                                                 \
++    return v##OP##_vx_##CHAR##SEW##LMUL(dst, src, lanes);                  \
+   }
+ 
+ namespace detail {
+@@ -1333,7 +1305,7 @@ template <size_t kLanes, class V>
+ HWY_API V ShiftLeftLanes(const V v) {
+   using D = DFromV<V>;
+   const RebindToSigned<D> di;
+-  const auto shifted = detail::SlideUp(v, kLanes);
++  const auto shifted = detail::SlideUp(v, v, kLanes);
+   // Match x86 semantics by zeroing lower lanes in 128-bit blocks
+   constexpr size_t kLanesPerBlock = detail::LanesPerBlock(di);
+   const auto idx_mod = detail::And(detail::Iota0(di), kLanesPerBlock - 1);
+@@ -1363,7 +1335,7 @@ template <size_t kLanes, class V>
+ HWY_API V ShiftRightLanes(const V v) {
+   using D = DFromV<V>;
+   const RebindToSigned<D> di;
+-  const auto shifted = detail::SlideDown(v, kLanes);
++  const auto shifted = detail::SlideDown(v, v, kLanes);
+   // Match x86 semantics by zeroing upper lanes in 128-bit blocks
+   constexpr size_t kLanesPerBlock = detail::LanesPerBlock(di);
+   const auto idx_mod = detail::And(detail::Iota0(di), kLanesPerBlock - 1);
+@@ -1405,7 +1377,7 @@ HWY_API V ConcatUpperLower(const V hi, c
+ template <class V>
+ HWY_API V ConcatLowerLower(const V hi, const V lo) {
+   // Move lower half into upper
+-  const auto hi_up = detail::SlideUp(hi, Lanes(DFromV<V>()) / 2);
++  const auto hi_up = detail::SlideUp(hi, hi, Lanes(DFromV<V>()) / 2);
+   return ConcatUpperLower(hi_up, lo);
+ }
+ 
+@@ -1414,7 +1386,7 @@ HWY_API V ConcatLowerLower(const V hi, c
+ template <class V>
+ HWY_API V ConcatUpperUpper(const V hi, const V lo) {
+   // Move upper half into lower
+-  const auto lo_down = detail::SlideDown(lo, Lanes(DFromV<V>()) / 2);
++  const auto lo_down = detail::SlideDown(lo, lo, Lanes(DFromV<V>()) / 2);
+   return ConcatUpperLower(hi, lo_down);
+ }
+ 
+@@ -1423,8 +1395,8 @@ HWY_API V ConcatUpperUpper(const V hi, c
+ template <class V>
+ HWY_API V ConcatLowerUpper(const V hi, const V lo) {
+   // Move half of both inputs to the other half
+-  const auto hi_up = detail::SlideUp(hi, Lanes(DFromV<V>()) / 2);
+-  const auto lo_down = detail::SlideDown(lo, Lanes(DFromV<V>()) / 2);
++  const auto hi_up = detail::SlideUp(hi, hi, Lanes(DFromV<V>()) / 2);
++  const auto lo_down = detail::SlideDown(lo, lo, Lanes(DFromV<V>()) / 2);
+   return ConcatUpperLower(hi_up, lo_down);
+ }
+ 
+@@ -1491,61 +1463,55 @@ HWY_API V Combine(const V a, const V b)
+ // ================================================== REDUCE
+ 
+ // vector = f(vector, zero_m1)
+-#define HWY_RVV_REDUCE(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)             \
+-  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                      \
+-      NAME(HWY_RVV_V(BASE, SEW, LMUL) v, HWY_RVV_V(BASE, SEW, 1) v0) {    \
+-    vsetvlmax_e##SEW##m##LMUL();                                          \
+-    return Set(HWY_RVV_D(CHAR, SEW, LMUL)(),                              \
+-               GetLane(v##OP##_vs_##CHAR##SEW##m##LMUL##_##CHAR##SEW##m1( \
+-                   v0, v, v0)));                                          \
++#define HWY_RVV_REDUCE(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)         \
++  HWY_API HWY_RVV_V(BASE, SEW, LMUL)                                         \
++      NAME(HWY_RVV_V(BASE, SEW, LMUL) v, HWY_RVV_V(BASE, SEW, m1) v0) {      \
++    vsetvlmax_e##SEW##LMUL();                                                \
++    return Set(                                                              \
++        HWY_RVV_D(CHAR, SEW, LMUL)(),                                        \
++        GetLane(v##OP##_vs_##CHAR##SEW##LMUL##_##CHAR##SEW##m1(v0, v, v0))); \
+   }
+ 
+ // ------------------------------ SumOfLanes
+ 
+ namespace detail {
+-
+ HWY_RVV_FOREACH_UI(HWY_RVV_REDUCE, RedSum, redsum)
+ HWY_RVV_FOREACH_F(HWY_RVV_REDUCE, RedSum, fredsum)
+-
+ }  // namespace detail
+ 
+ template <class V>
+ HWY_API V SumOfLanes(const V v) {
+   using T = TFromV<V>;
+-  const auto v0 = Zero(Simd<T, HWY_LANES(T)>());  // always m1
++  const auto v0 = Zero(Full<T>());  // always m1
+   return detail::RedSum(v, v0);
+ }
+ 
+ // ------------------------------ MinOfLanes
+ namespace detail {
+-
+ HWY_RVV_FOREACH_U(HWY_RVV_REDUCE, RedMin, redminu)
+ HWY_RVV_FOREACH_I(HWY_RVV_REDUCE, RedMin, redmin)
+ HWY_RVV_FOREACH_F(HWY_RVV_REDUCE, RedMin, fredmin)
+-
+ }  // namespace detail
+ 
+ template <class V>
+ HWY_API V MinOfLanes(const V v) {
+   using T = TFromV<V>;
+-  const Simd<T, HWY_LANES(T)> d1;  // always m1
++  const Full<T> d1;  // always m1
+   const auto neutral = Set(d1, HighestValue<T>());
+   return detail::RedMin(v, neutral);
+ }
+ 
+ // ------------------------------ MaxOfLanes
+ namespace detail {
+-
+ HWY_RVV_FOREACH_U(HWY_RVV_REDUCE, RedMax, redmaxu)
+ HWY_RVV_FOREACH_I(HWY_RVV_REDUCE, RedMax, redmax)
+ HWY_RVV_FOREACH_F(HWY_RVV_REDUCE, RedMax, fredmax)
+-
+ }  // namespace detail
+ 
+ template <class V>
+ HWY_API V MaxOfLanes(const V v) {
+   using T = TFromV<V>;
+-  const Simd<T, HWY_LANES(T)> d1;  // always m1
++  const Full<T> d1;  // always m1
+   const auto neutral = Set(d1, LowestValue<T>());
+   return detail::RedMax(v, neutral);
+ }
+@@ -1570,7 +1536,7 @@ HWY_API VFromD<D> LoadDup128(D d, const
+ #define HWY_RVV_STORE_MASK_BITS(MLEN, NAME, OP)                 \
+   HWY_API size_t StoreMaskBits(HWY_RVV_M(MLEN) m, uint8_t* p) { \
+     /* LMUL=1 is always enough */                               \
+-    Simd<uint8_t, HWY_LANES(uint8_t)> d8;                       \
++    Full<uint8_t> d8;                                           \
+     const size_t num_bytes = (Lanes(d8) + MLEN - 1) / MLEN;     \
+     /* TODO(janwas): how to convert vbool* to vuint?*/          \
+     /*Store(m, d8, p);*/                                        \
+@@ -1581,6 +1547,22 @@ HWY_API VFromD<D> LoadDup128(D d, const
+ HWY_RVV_FOREACH_B(HWY_RVV_STORE_MASK_BITS, _, _)
+ #undef HWY_RVV_STORE_MASK_BITS
+ 
++// ------------------------------ FirstN (Iota0, Lt, RebindMask, SlideUp)
++
++// Disallow for 8-bit because Iota is likely to overflow.
++template <class D, HWY_IF_NOT_LANE_SIZE_D(D, 1)>
++HWY_API MFromD<D> FirstN(const D d, const size_t n) {
++  const RebindToSigned<D> di;
++  return RebindMask(d, Lt(BitCast(di, detail::Iota0(d)), Set(di, n)));
++}
++
++template <class D, HWY_IF_LANE_SIZE_D(D, 1)>
++HWY_API MFromD<D> FirstN(const D d, const size_t n) {
++  const auto zero = Zero(d);
++  const auto one = Set(d, 1);
++  return Eq(detail::SlideUp(one, zero, n), one);
++}
++
+ // ------------------------------ Neg
+ 
+ template <class V, HWY_IF_SIGNED_V(V)>
+@@ -1589,9 +1571,9 @@ HWY_API V Neg(const V v) {
+ }
+ 
+ // vector = f(vector), but argument is repeated
+-#define HWY_RVV_RETV_ARGV2(BASE, CHAR, SEW, LMUL, MLEN, NAME, OP)         \
++#define HWY_RVV_RETV_ARGV2(BASE, CHAR, SEW, LMUL, SHIFT, MLEN, NAME, OP)  \
+   HWY_API HWY_RVV_V(BASE, SEW, LMUL) NAME(HWY_RVV_V(BASE, SEW, LMUL) v) { \
+-    return v##OP##_vv_##CHAR##SEW##m##LMUL(v, v);                         \
++    return v##OP##_vv_##CHAR##SEW##LMUL(v, v);                            \
+   }
+ 
+ HWY_RVV_FOREACH_F(HWY_RVV_RETV_ARGV2, Neg, fsgnjn)
+@@ -1628,7 +1610,6 @@ template <class V>
+ HWY_API auto UseInt(const V v) -> decltype(MaskFromVec(v)) {
+   return Lt(Abs(v), Set(DFromV<V>(), MantissaEnd<TFromV<V>>()));
+ }
+-
+ }  // namespace detail
+ 
+ template <class V>
+@@ -1699,10 +1680,8 @@ HWY_API VFromD<D> Iota(const D d, TFromD
+ // Using vwmul does not work for m8, so use mulh instead. Highway only provides
+ // MulHigh for 16-bit, so use a private wrapper.
+ namespace detail {
+-
+ HWY_RVV_FOREACH_U32(HWY_RVV_RETV_ARGVV, MulHigh, mulhu)
+ HWY_RVV_FOREACH_I32(HWY_RVV_RETV_ARGVV, MulHigh, mulh)
+-
+ }  // namespace detail
+ 
+ template <class V>
+@@ -1712,7 +1691,7 @@ HWY_API VFromD<RepartitionToWide<DFromV<
+   const auto lo = Mul(a, b);
+   const auto hi = detail::MulHigh(a, b);
+   const RepartitionToWide<DFromV<V>> dw;
+-  return BitCast(dw, OddEven(detail::SlideUp(hi, 1), lo));
++  return BitCast(dw, OddEven(detail::SlideUp(hi, hi, 1), lo));
+ }
+ 
+ // ================================================== END MACROS
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/ops/x86_128-inl.h.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/ops/x86_128-inl.h
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/ops/x86_128-inl.h.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/ops/x86_128-inl.h	2021-07-26 17:19:52.153729522 -0400
+@@ -154,27 +154,28 @@ HWY_API Vec128<double, N> Zero(Simd<doub
+ // Returns a vector/part with all lanes set to "t".
+ template <size_t N, HWY_IF_LE128(uint8_t, N)>
+ HWY_API Vec128<uint8_t, N> Set(Simd<uint8_t, N> /* tag */, const uint8_t t) {
+-  return Vec128<uint8_t, N>{_mm_set1_epi8(t)};
++  return Vec128<uint8_t, N>{_mm_set1_epi8(static_cast<char>(t))};  // NOLINT
+ }
+ template <size_t N, HWY_IF_LE128(uint16_t, N)>
+ HWY_API Vec128<uint16_t, N> Set(Simd<uint16_t, N> /* tag */, const uint16_t t) {
+-  return Vec128<uint16_t, N>{_mm_set1_epi16(t)};
++  return Vec128<uint16_t, N>{_mm_set1_epi16(static_cast<short>(t))};  // NOLINT
+ }
+ template <size_t N, HWY_IF_LE128(uint32_t, N)>
+ HWY_API Vec128<uint32_t, N> Set(Simd<uint32_t, N> /* tag */, const uint32_t t) {
+-  return Vec128<uint32_t, N>{_mm_set1_epi32(t)};
++  return Vec128<uint32_t, N>{_mm_set1_epi32(static_cast<int>(t))};
+ }
+ template <size_t N, HWY_IF_LE128(uint64_t, N)>
+ HWY_API Vec128<uint64_t, N> Set(Simd<uint64_t, N> /* tag */, const uint64_t t) {
+-  return Vec128<uint64_t, N>{_mm_set1_epi64x(t)};
++  return Vec128<uint64_t, N>{
++      _mm_set1_epi64x(static_cast<long long>(t))};  // NOLINT
+ }
+ template <size_t N, HWY_IF_LE128(int8_t, N)>
+ HWY_API Vec128<int8_t, N> Set(Simd<int8_t, N> /* tag */, const int8_t t) {
+-  return Vec128<int8_t, N>{_mm_set1_epi8(t)};
++  return Vec128<int8_t, N>{_mm_set1_epi8(static_cast<char>(t))};  // NOLINT
+ }
+ template <size_t N, HWY_IF_LE128(int16_t, N)>
+ HWY_API Vec128<int16_t, N> Set(Simd<int16_t, N> /* tag */, const int16_t t) {
+-  return Vec128<int16_t, N>{_mm_set1_epi16(t)};
++  return Vec128<int16_t, N>{_mm_set1_epi16(static_cast<short>(t))};  // NOLINT
+ }
+ template <size_t N, HWY_IF_LE128(int32_t, N)>
+ HWY_API Vec128<int32_t, N> Set(Simd<int32_t, N> /* tag */, const int32_t t) {
+@@ -182,7 +183,8 @@ HWY_API Vec128<int32_t, N> Set(Simd<int3
+ }
+ template <size_t N, HWY_IF_LE128(int64_t, N)>
+ HWY_API Vec128<int64_t, N> Set(Simd<int64_t, N> /* tag */, const int64_t t) {
+-  return Vec128<int64_t, N>{_mm_set1_epi64x(t)};
++  return Vec128<int64_t, N>{
++      _mm_set1_epi64x(static_cast<long long>(t))};  // NOLINT
+ }
+ template <size_t N, HWY_IF_LE128(float, N)>
+ HWY_API Vec128<float, N> Set(Simd<float, N> /* tag */, const float t) {
+@@ -684,6 +686,14 @@ HWY_API Mask128<double, N> operator>=(co
+   return Mask128<double, N>{_mm_cmpge_pd(a.raw, b.raw)};
+ }
+ 
++// ------------------------------ FirstN (Iota, Lt)
++
++template <typename T, size_t N, HWY_IF_LE128(T, N)>
++HWY_API Mask128<T, N> FirstN(const Simd<T, N> d, size_t num) {
++  const RebindToSigned<decltype(d)> di;  // Signed comparisons are cheaper.
++  return RebindMask(d, Iota(di, 0) < Set(di, static_cast<MakeSigned<T>>(num)));
++}
++
+ // ================================================== ARITHMETIC
+ 
+ // ------------------------------ Addition
+@@ -895,7 +905,7 @@ template <size_t N>
+ HWY_API Vec128<int32_t, N> Abs(const Vec128<int32_t, N> v) {
+   return Vec128<int32_t, N>{_mm_abs_epi32(v.raw)};
+ }
+-
++// i64 is implemented after BroadcastSignBit.
+ template <size_t N>
+ HWY_API Vec128<float, N> Abs(const Vec128<float, N> v) {
+   const Vec128<int32_t, N> mask{_mm_set1_epi32(0x7FFFFFFF)};
+@@ -1067,15 +1077,24 @@ HWY_API Vec128<int64_t, N> BroadcastSign
+   return VecFromMask(v < Zero(Simd<int64_t, N>()));
+ #else
+   // Efficient Gt() requires SSE4.2 but we only have SSE4.1. BLENDVPD requires
+-  // two constants and domain crossing. 32-bit compare only requires Zero()
+-  // plus a shuffle to replicate the upper 32 bits.
++  // two constants and domain crossing. 32-bit shift avoids generating a zero.
+   const Simd<int32_t, N * 2> d32;
+-  const auto sign = BitCast(d32, v) < Zero(d32);
++  const auto sign = ShiftRight<31>(BitCast(d32, v));
+   return Vec128<int64_t, N>{
+       _mm_shuffle_epi32(sign.raw, _MM_SHUFFLE(3, 3, 1, 1))};
+ #endif
+ }
+ 
++template <size_t N>
++HWY_API Vec128<int64_t, N> Abs(const Vec128<int64_t, N> v) {
++#if HWY_TARGET == HWY_AVX3
++  return Vec128<int64_t, N>{_mm_abs_epi64(v.raw)};
++#else
++  const auto zero = Zero(Simd<int64_t,N>());
++  return IfThenElse(MaskFromVec(BroadcastSignBit(v)), zero - v, v);
++#endif
++}
++
+ template <int kBits, size_t N>
+ HWY_API Vec128<int64_t, N> ShiftRight(const Vec128<int64_t, N> v) {
+ #if HWY_TARGET == HWY_AVX3
+@@ -1787,6 +1806,10 @@ HWY_API void Stream(const Vec128<double,
+ 
+ // ------------------------------ Scatter
+ 
++// Work around warnings in the intrinsic definitions (passing -1 as a mask).
++HWY_DIAGNOSTICS(push)
++HWY_DIAGNOSTICS_OFF(disable : 4245 4365, ignored "-Wsign-conversion")
++
+ // Unfortunately the GCC/Clang intrinsics do not accept int64_t*.
+ using GatherIndex64 = long long int;  // NOLINT(google-runtime-int)
+ static_assert(sizeof(GatherIndex64) == 8, "Must be 64-bit type");
+@@ -2048,6 +2071,8 @@ HWY_API Vec128<double, N> GatherIndex(Si
+ 
+ #endif  // HWY_TARGET != HWY_SSE4
+ 
++HWY_DIAGNOSTICS(pop)
++
+ // ================================================== SWIZZLE
+ 
+ // ------------------------------ Extract half
+@@ -2075,10 +2100,10 @@ HWY_INLINE Vec128<double, 1> UpperHalf(V
+ // ------------------------------ Shift vector by constant #bytes
+ 
+ // 0x01..0F, kBytes = 1 => 0x02..0F00
+-template <int kBytes, typename T>
+-HWY_API Vec128<T> ShiftLeftBytes(const Vec128<T> v) {
++template <int kBytes, typename T, size_t N>
++HWY_API Vec128<T, N> ShiftLeftBytes(const Vec128<T, N> v) {
+   static_assert(0 <= kBytes && kBytes <= 16, "Invalid kBytes");
+-  return Vec128<T>{_mm_slli_si128(v.raw, kBytes)};
++  return Vec128<T, N>{_mm_slli_si128(v.raw, kBytes)};
+ }
+ 
+ template <int kLanes, typename T, size_t N>
+@@ -2089,10 +2114,10 @@ HWY_API Vec128<T, N> ShiftLeftLanes(cons
+ }
+ 
+ // 0x01..0F, kBytes = 1 => 0x0001..0E
+-template <int kBytes, typename T>
+-HWY_API Vec128<T> ShiftRightBytes(const Vec128<T> v) {
++template <int kBytes, typename T, size_t N>
++HWY_API Vec128<T, N> ShiftRightBytes(const Vec128<T, N> v) {
+   static_assert(0 <= kBytes && kBytes <= 16, "Invalid kBytes");
+-  return Vec128<T>{_mm_srli_si128(v.raw, kBytes)};
++  return Vec128<T, N>{_mm_srli_si128(v.raw, kBytes)};
+ }
+ 
+ template <int kLanes, typename T, size_t N>
+@@ -2257,44 +2282,47 @@ HWY_API Vec128<float> Shuffle0123(const
+ // ------------------------------ TableLookupLanes
+ 
+ // Returned by SetTableIndices for use by TableLookupLanes.
+-template <typename T>
++template <typename T, size_t N>
+ struct Indices128 {
+   __m128i raw;
+ };
+ 
+-template <typename T>
+-HWY_API Indices128<T> SetTableIndices(Full128<T>, const int32_t* idx) {
++template <typename T, size_t N, HWY_IF_LE128(T, N)>
++HWY_API Indices128<T, N> SetTableIndices(Simd<T, N> d, const int32_t* idx) {
+ #if !defined(NDEBUG) || defined(ADDRESS_SANITIZER)
+-  const size_t N = 16 / sizeof(T);
+   for (size_t i = 0; i < N; ++i) {
+     HWY_DASSERT(0 <= idx[i] && idx[i] < static_cast<int32_t>(N));
+   }
+ #endif
+ 
+-  const Full128<uint8_t> d8;
+-  alignas(16) uint8_t control[16];
+-  for (size_t idx_byte = 0; idx_byte < 16; ++idx_byte) {
+-    const size_t idx_lane = idx_byte / sizeof(T);
+-    const size_t mod = idx_byte % sizeof(T);
+-    control[idx_byte] = static_cast<uint8_t>(idx[idx_lane] * sizeof(T) + mod);
++  const Repartition<uint8_t, decltype(d)> d8;
++  alignas(16) uint8_t control[16] = {0};
++  for (size_t idx_lane = 0; idx_lane < N; ++idx_lane) {
++    for (size_t idx_byte = 0; idx_byte < sizeof(T); ++idx_byte) {
++      control[idx_lane * sizeof(T) + idx_byte] =
++          static_cast<uint8_t>(idx[idx_lane] * sizeof(T) + idx_byte);
++    }
+   }
+-  return Indices128<T>{Load(d8, control).raw};
++  return Indices128<T, N>{Load(d8, control).raw};
+ }
+ 
+-HWY_API Vec128<uint32_t> TableLookupLanes(const Vec128<uint32_t> v,
+-                                          const Indices128<uint32_t> idx) {
+-  return TableLookupBytes(v, Vec128<uint32_t>{idx.raw});
++template <size_t N>
++HWY_API Vec128<uint32_t, N> TableLookupLanes(
++    const Vec128<uint32_t, N> v, const Indices128<uint32_t, N> idx) {
++  return TableLookupBytes(v, Vec128<uint32_t, N>{idx.raw});
+ }
+-HWY_API Vec128<int32_t> TableLookupLanes(const Vec128<int32_t> v,
+-                                         const Indices128<int32_t> idx) {
+-  return TableLookupBytes(v, Vec128<int32_t>{idx.raw});
++template <size_t N>
++HWY_API Vec128<int32_t, N> TableLookupLanes(const Vec128<int32_t, N> v,
++                                            const Indices128<int32_t, N> idx) {
++  return TableLookupBytes(v, Vec128<int32_t, N>{idx.raw});
+ }
+-HWY_API Vec128<float> TableLookupLanes(const Vec128<float> v,
+-                                       const Indices128<float> idx) {
+-  const Full128<int32_t> di;
+-  const Full128<float> df;
++template <size_t N>
++HWY_API Vec128<float, N> TableLookupLanes(const Vec128<float, N> v,
++                                          const Indices128<float, N> idx) {
++  const Simd<int32_t, N> di;
++  const Simd<float, N> df;
+   return BitCast(df,
+-                 TableLookupBytes(BitCast(di, v), Vec128<int32_t>{idx.raw}));
++                 TableLookupBytes(BitCast(di, v), Vec128<int32_t, N>{idx.raw}));
+ }
+ 
+ // ------------------------------ Interleave lanes
+@@ -2502,47 +2530,47 @@ HWY_INLINE Vec128<double> ConcatUpperLow
+ 
+ namespace detail {
+ 
+-template <typename T>
+-HWY_API Vec128<T> OddEven(hwy::SizeTag<1> /* tag */, const Vec128<T> a,
+-                          const Vec128<T> b) {
+-  const Full128<T> d;
+-  const Full128<uint8_t> d8;
++template <typename T, size_t N>
++HWY_API Vec128<T, N> OddEven(hwy::SizeTag<1> /* tag */, const Vec128<T, N> a,
++                             const Vec128<T, N> b) {
++  const Simd<T, N> d;
++  const Repartition<uint8_t, decltype(d)> d8;
+   alignas(16) constexpr uint8_t mask[16] = {0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF, 0,
+                                             0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF, 0};
+   return IfThenElse(MaskFromVec(BitCast(d, Load(d8, mask))), b, a);
+ }
+-template <typename T>
+-HWY_API Vec128<T> OddEven(hwy::SizeTag<2> /* tag */, const Vec128<T> a,
+-                          const Vec128<T> b) {
+-  return Vec128<T>{_mm_blend_epi16(a.raw, b.raw, 0x55)};
++template <typename T, size_t N>
++HWY_API Vec128<T, N> OddEven(hwy::SizeTag<2> /* tag */, const Vec128<T, N> a,
++                             const Vec128<T, N> b) {
++  return Vec128<T, N>{_mm_blend_epi16(a.raw, b.raw, 0x55)};
+ }
+-template <typename T>
+-HWY_API Vec128<T> OddEven(hwy::SizeTag<4> /* tag */, const Vec128<T> a,
+-                          const Vec128<T> b) {
+-  return Vec128<T>{_mm_blend_epi16(a.raw, b.raw, 0x33)};
++template <typename T, size_t N>
++HWY_API Vec128<T, N> OddEven(hwy::SizeTag<4> /* tag */, const Vec128<T, N> a,
++                             const Vec128<T, N> b) {
++  return Vec128<T, N>{_mm_blend_epi16(a.raw, b.raw, 0x33)};
+ }
+-template <typename T>
+-HWY_API Vec128<T> OddEven(hwy::SizeTag<8> /* tag */, const Vec128<T> a,
+-                          const Vec128<T> b) {
+-  return Vec128<T>{_mm_blend_epi16(a.raw, b.raw, 0x0F)};
++template <typename T, size_t N>
++HWY_API Vec128<T, N> OddEven(hwy::SizeTag<8> /* tag */, const Vec128<T, N> a,
++                             const Vec128<T, N> b) {
++  return Vec128<T, N>{_mm_blend_epi16(a.raw, b.raw, 0x0F)};
+ }
+ 
+ }  // namespace detail
+ 
+-template <typename T>
+-HWY_API Vec128<T> OddEven(const Vec128<T> a, const Vec128<T> b) {
++template <typename T, size_t N>
++HWY_API Vec128<T, N> OddEven(const Vec128<T, N> a, const Vec128<T, N> b) {
+   return detail::OddEven(hwy::SizeTag<sizeof(T)>(), a, b);
+ }
+-template <>
+-HWY_INLINE Vec128<float> OddEven<float>(const Vec128<float> a,
+-                                        const Vec128<float> b) {
+-  return Vec128<float>{_mm_blend_ps(a.raw, b.raw, 5)};
++template <size_t N>
++HWY_INLINE Vec128<float, N> OddEven(const Vec128<float, N> a,
++                                    const Vec128<float, N> b) {
++  return Vec128<float, N>{_mm_blend_ps(a.raw, b.raw, 5)};
+ }
+ 
+-template <>
+-HWY_INLINE Vec128<double> OddEven<double>(const Vec128<double> a,
+-                                          const Vec128<double> b) {
+-  return Vec128<double>{_mm_blend_pd(a.raw, b.raw, 1)};
++template <size_t N>
++HWY_INLINE Vec128<double, N> OddEven(const Vec128<double, N> a,
++                                     const Vec128<double, N> b) {
++  return Vec128<double, N>{_mm_blend_pd(a.raw, b.raw, 1)};
+ }
+ 
+ // ------------------------------ Shl (ZipLower, Mul)
+@@ -2980,7 +3008,7 @@ HWY_API Vec128<uint8_t, N> U8FromU32(con
+   return LowerHalf(LowerHalf(BitCast(d8, quad)));
+ }
+ 
+-// ------------------------------ Convert integer <=> floating point
++// ------------------------------ Integer <=> fp (ShiftRight, OddEven)
+ 
+ template <size_t N>
+ HWY_API Vec128<float, N> ConvertTo(Simd<float, N> /* tag */,
+@@ -2995,13 +3023,20 @@ HWY_API Vec128<double, N> ConvertTo(Simd
+   (void)dd;
+   return Vec128<double, N>{_mm_cvtepi64_pd(v.raw)};
+ #else
+-  alignas(16) int64_t lanes_i[2];
+-  Store(v, Simd<int64_t, N>(), lanes_i);
+-  alignas(16) double lanes_d[2];
+-  for (size_t i = 0; i < N; ++i) {
+-    lanes_d[i] = static_cast<double>(lanes_i[i]);
+-  }
+-  return Load(dd, lanes_d);
++  // Based on wim's approach (https://stackoverflow.com/questions/41144668/)
++  const Repartition<uint32_t, decltype(dd)> d32;
++  const Repartition<uint64_t, decltype(dd)> d64;
++
++  // Toggle MSB of lower 32-bits and insert exponent for 2^84 + 2^63
++  const auto k84_63 = Set(d64, 0x4530000080000000ULL);
++  const auto v_upper = BitCast(dd, ShiftRight<32>(BitCast(d64, v)) ^ k84_63);
++
++  // Exponent is 2^52, lower 32 bits from v (=> 32-bit OddEven)
++  const auto k52 = Set(d32, 0x43300000);
++  const auto v_lower = BitCast(dd, OddEven(k52, BitCast(d32, v)));
++
++  const auto k84_63_52 = BitCast(dd, Set(d64, 0x4530000080100000ULL));
++  return (v_upper - k84_63_52) + v_lower;  // order matters!
+ #endif
+ }
+ 
+@@ -3572,55 +3607,87 @@ HWY_API void StoreInterleaved4(const Vec
+ 
+ namespace detail {
+ 
+-// For u32/i32/f32.
+-template <typename T, size_t N>
+-HWY_API Vec128<T, N> SumOfLanes(hwy::SizeTag<4> /* tag */,
+-                                const Vec128<T, N> v3210) {
++// N=1 for any T: no-op
++template <typename T>
++HWY_API Vec128<T, 1> SumOfLanes(hwy::SizeTag<sizeof(T)> /* tag */,
++                                const Vec128<T, 1> v) {
++  return v;
++}
++template <typename T>
++HWY_API Vec128<T, 1> MinOfLanes(hwy::SizeTag<sizeof(T)> /* tag */,
++                                const Vec128<T, 1> v) {
++  return v;
++}
++template <typename T>
++HWY_API Vec128<T, 1> MaxOfLanes(hwy::SizeTag<sizeof(T)> /* tag */,
++                                const Vec128<T, 1> v) {
++  return v;
++}
++
++// u32/i32/f32:
++
++// N=2
++template <typename T>
++HWY_API Vec128<T, 2> SumOfLanes(hwy::SizeTag<4> /* tag */,
++                                const Vec128<T, 2> v10) {
++  return v10 + Vec128<T, 2>{Shuffle2301(Vec128<T>{v10.raw}).raw};
++}
++template <typename T>
++HWY_API Vec128<T, 2> MinOfLanes(hwy::SizeTag<4> /* tag */,
++                                const Vec128<T, 2> v10) {
++  return Min(v10, Vec128<T, 2>{Shuffle2301(Vec128<T>{v10.raw}).raw});
++}
++template <typename T>
++HWY_API Vec128<T, 2> MaxOfLanes(hwy::SizeTag<4> /* tag */,
++                                const Vec128<T, 2> v10) {
++  return Max(v10, Vec128<T, 2>{Shuffle2301(Vec128<T>{v10.raw}).raw});
++}
++
++// N=4 (full)
++template <typename T>
++HWY_API Vec128<T> SumOfLanes(hwy::SizeTag<4> /* tag */, const Vec128<T> v3210) {
+   const Vec128<T> v1032 = Shuffle1032(v3210);
+   const Vec128<T> v31_20_31_20 = v3210 + v1032;
+   const Vec128<T> v20_31_20_31 = Shuffle0321(v31_20_31_20);
+   return v20_31_20_31 + v31_20_31_20;
+ }
+-template <typename T, size_t N>
+-HWY_API Vec128<T, N> MinOfLanes(hwy::SizeTag<4> /* tag */,
+-                                const Vec128<T, N> v3210) {
++template <typename T>
++HWY_API Vec128<T> MinOfLanes(hwy::SizeTag<4> /* tag */, const Vec128<T> v3210) {
+   const Vec128<T> v1032 = Shuffle1032(v3210);
+   const Vec128<T> v31_20_31_20 = Min(v3210, v1032);
+   const Vec128<T> v20_31_20_31 = Shuffle0321(v31_20_31_20);
+   return Min(v20_31_20_31, v31_20_31_20);
+ }
+-template <typename T, size_t N>
+-HWY_API Vec128<T, N> MaxOfLanes(hwy::SizeTag<4> /* tag */,
+-                                const Vec128<T, N> v3210) {
++template <typename T>
++HWY_API Vec128<T> MaxOfLanes(hwy::SizeTag<4> /* tag */, const Vec128<T> v3210) {
+   const Vec128<T> v1032 = Shuffle1032(v3210);
+   const Vec128<T> v31_20_31_20 = Max(v3210, v1032);
+   const Vec128<T> v20_31_20_31 = Shuffle0321(v31_20_31_20);
+   return Max(v20_31_20_31, v31_20_31_20);
+ }
+ 
+-// For u64/i64/f64.
+-template <typename T, size_t N>
+-HWY_API Vec128<T, N> SumOfLanes(hwy::SizeTag<8> /* tag */,
+-                                const Vec128<T, N> v10) {
++// u64/i64/f64:
++
++// N=2 (full)
++template <typename T>
++HWY_API Vec128<T> SumOfLanes(hwy::SizeTag<8> /* tag */, const Vec128<T> v10) {
+   const Vec128<T> v01 = Shuffle01(v10);
+   return v10 + v01;
+ }
+-template <typename T, size_t N>
+-HWY_API Vec128<T, N> MinOfLanes(hwy::SizeTag<8> /* tag */,
+-                                const Vec128<T, N> v10) {
++template <typename T>
++HWY_API Vec128<T> MinOfLanes(hwy::SizeTag<8> /* tag */, const Vec128<T> v10) {
+   const Vec128<T> v01 = Shuffle01(v10);
+   return Min(v10, v01);
+ }
+-template <typename T, size_t N>
+-HWY_API Vec128<T, N> MaxOfLanes(hwy::SizeTag<8> /* tag */,
+-                                const Vec128<T, N> v10) {
++template <typename T>
++HWY_API Vec128<T> MaxOfLanes(hwy::SizeTag<8> /* tag */, const Vec128<T> v10) {
+   const Vec128<T> v01 = Shuffle01(v10);
+   return Max(v10, v01);
+ }
+ 
+ }  // namespace detail
+ 
+-// Supported for u/i/f 32/64. Returns the sum in each lane.
++// Supported for u/i/f 32/64. Returns the same value in each lane.
+ template <typename T, size_t N>
+ HWY_API Vec128<T, N> SumOfLanes(const Vec128<T, N> v) {
+   return detail::SumOfLanes(hwy::SizeTag<sizeof(T)>(), v);
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/ops/x86_256-inl.h.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/ops/x86_256-inl.h
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/ops/x86_256-inl.h.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/ops/x86_256-inl.h	2021-07-26 17:19:30.740403369 -0400
+@@ -20,15 +20,18 @@
+ // particular, "Broadcast", pack and zip behavior may be surprising.
+ 
+ #include <immintrin.h>  // AVX2+
++
+ #if defined(_MSC_VER) && defined(__clang__)
+ // Including <immintrin.h> should be enough, but Clang's headers helpfully skip
+ // including these headers when _MSC_VER is defined, like when using clang-cl.
+ // Include these directly here.
+-#include <smmintrin.h>
+ #include <avxintrin.h>
++// avxintrin defines __m256i and must come before avx2intrin.
+ #include <avx2intrin.h>
++#include <bmi2intrin.h>  // _pext_u64
+ #include <f16cintrin.h>
+ #include <fmaintrin.h>
++#include <smmintrin.h>
+ #endif
+ 
+ #include <stddef.h>
+@@ -159,23 +162,24 @@ HWY_API Vec256<uint16_t> Set(Full256<uin
+   return Vec256<uint16_t>{_mm256_set1_epi16(static_cast<short>(t))};  // NOLINT
+ }
+ HWY_API Vec256<uint32_t> Set(Full256<uint32_t> /* tag */, const uint32_t t) {
+-  return Vec256<uint32_t>{_mm256_set1_epi32(static_cast<int>(t))};  // NOLINT
++  return Vec256<uint32_t>{_mm256_set1_epi32(static_cast<int>(t))};
+ }
+ HWY_API Vec256<uint64_t> Set(Full256<uint64_t> /* tag */, const uint64_t t) {
+   return Vec256<uint64_t>{
+       _mm256_set1_epi64x(static_cast<long long>(t))};  // NOLINT
+ }
+ HWY_API Vec256<int8_t> Set(Full256<int8_t> /* tag */, const int8_t t) {
+-  return Vec256<int8_t>{_mm256_set1_epi8(t)};
++  return Vec256<int8_t>{_mm256_set1_epi8(static_cast<char>(t))};  // NOLINT
+ }
+ HWY_API Vec256<int16_t> Set(Full256<int16_t> /* tag */, const int16_t t) {
+-  return Vec256<int16_t>{_mm256_set1_epi16(t)};
++  return Vec256<int16_t>{_mm256_set1_epi16(static_cast<short>(t))};  // NOLINT
+ }
+ HWY_API Vec256<int32_t> Set(Full256<int32_t> /* tag */, const int32_t t) {
+   return Vec256<int32_t>{_mm256_set1_epi32(t)};
+ }
+ HWY_API Vec256<int64_t> Set(Full256<int64_t> /* tag */, const int64_t t) {
+-  return Vec256<int64_t>{_mm256_set1_epi64x(t)};
++  return Vec256<int64_t>{
++      _mm256_set1_epi64x(static_cast<long long>(t))};  // NOLINT
+ }
+ HWY_API Vec256<float> Set(Full256<float> /* tag */, const float t) {
+   return Vec256<float>{_mm256_set1_ps(t)};
+@@ -351,6 +355,8 @@ HWY_API Vec256<T> VecFromMask(Full256<T>
+   return Vec256<T>{v.raw};
+ }
+ 
++// ------------------------------ IfThenElse
++
+ // mask ? yes : no
+ template <typename T>
+ HWY_API Vec256<T> IfThenElse(const Mask256<T> mask, const Vec256<T> yes,
+@@ -681,6 +687,14 @@ HWY_API Vec256<double> Max(const Vec256<
+   return Vec256<double>{_mm256_max_pd(a.raw, b.raw)};
+ }
+ 
++// ------------------------------ FirstN (Iota, Lt)
++
++template <typename T>
++HWY_API Mask256<T> FirstN(const Full256<T> d, size_t n) {
++  const RebindToSigned<decltype(d)> di;  // Signed comparisons are cheaper.
++  return RebindMask(d, Iota(di, 0) < Set(di, static_cast<MakeSigned<T>>(n)));
++}
++
+ // ================================================== ARITHMETIC
+ 
+ // ------------------------------ Addition
+@@ -843,7 +857,13 @@ HWY_API Vec256<uint16_t> AverageRound(co
+ 
+ // Returns absolute value, except that LimitsMin() maps to LimitsMax() + 1.
+ HWY_API Vec256<int8_t> Abs(const Vec256<int8_t> v) {
++#if HWY_COMPILER_MSVC
++  // Workaround for incorrect codegen? (wrong result)
++  const auto zero = Zero(Full256<int8_t>());
++  return Vec256<int8_t>{_mm256_max_epi8(v.raw, (zero - v).raw)};
++#else
+   return Vec256<int8_t>{_mm256_abs_epi8(v.raw)};
++#endif
+ }
+ HWY_API Vec256<int16_t> Abs(const Vec256<int16_t> v) {
+   return Vec256<int16_t>{_mm256_abs_epi16(v.raw)};
+@@ -851,6 +871,7 @@ HWY_API Vec256<int16_t> Abs(const Vec256
+ HWY_API Vec256<int32_t> Abs(const Vec256<int32_t> v) {
+   return Vec256<int32_t>{_mm256_abs_epi32(v.raw)};
+ }
++// i64 is implemented after BroadcastSignBit.
+ 
+ HWY_API Vec256<float> Abs(const Vec256<float> v) {
+   const Vec256<int32_t> mask{_mm256_set1_epi32(0x7FFFFFFF)};
+@@ -1027,6 +1048,15 @@ HWY_API Vec256<int64_t> ShiftRight(const
+ #endif
+ }
+ 
++HWY_API Vec256<int64_t> Abs(const Vec256<int64_t> v) {
++#if HWY_TARGET == HWY_AVX3
++  return Vec256<int64_t>{_mm256_abs_epi64(v.raw)};
++#else
++  const auto zero = Zero(Full256<int64_t>());
++  return IfThenElse(MaskFromVec(BroadcastSignBit(v)), zero - v, v);
++#endif
++}
++
+ // ------------------------------ ShiftLeftSame
+ 
+ HWY_API Vec256<uint16_t> ShiftLeftSame(const Vec256<uint16_t> v,
+@@ -1398,6 +1428,10 @@ HWY_API void Stream(const Vec256<double>
+ 
+ // ------------------------------ Scatter
+ 
++// Work around warnings in the intrinsic definitions (passing -1 as a mask).
++HWY_DIAGNOSTICS(push)
++HWY_DIAGNOSTICS_OFF(disable : 4245 4365, ignored "-Wsign-conversion")
++
+ #if HWY_TARGET == HWY_AVX3
+ namespace detail {
+ 
+@@ -1584,6 +1618,8 @@ HWY_INLINE Vec256<double> GatherIndex<do
+   return Vec256<double>{_mm256_i64gather_pd(base, index.raw, 8)};
+ }
+ 
++HWY_DIAGNOSTICS(pop)
++
+ // ================================================== SWIZZLE
+ 
+ template <typename T>
+@@ -2379,11 +2415,18 @@ HWY_API Vec128<int8_t> DemoteTo(Full128<
+       _mm256_castsi256_si128(_mm256_permute4x64_epi64(i8, 0x88))};
+ }
+ 
++  // Avoid "value of intrinsic immediate argument '8' is out of range '0 - 7'".
++  // 8 is the correct value of _MM_FROUND_NO_EXC, which is allowed here.
++HWY_DIAGNOSTICS(push)
++HWY_DIAGNOSTICS_OFF(disable : 4556, ignored "-Wsign-conversion")
++
+ HWY_API Vec128<float16_t> DemoteTo(Full128<float16_t> /* tag */,
+                                    const Vec256<float> v) {
+   return Vec128<float16_t>{_mm256_cvtps_ph(v.raw, _MM_FROUND_NO_EXC)};
+ }
+ 
++HWY_DIAGNOSTICS(pop)
++
+ HWY_API Vec128<float> DemoteTo(Full128<float> /* tag */,
+                                const Vec256<double> v) {
+   return Vec128<float>{_mm256_cvtpd_ps(v.raw)};
+@@ -2409,7 +2452,7 @@ HWY_API Vec128<uint8_t, 8> U8FromU32(con
+   return BitCast(Simd<uint8_t, 8>(), pair);
+ }
+ 
+-// ------------------------------ Convert integer <=> floating point
++// ------------------------------ Integer <=> fp (ShiftRight, OddEven)
+ 
+ HWY_API Vec256<float> ConvertTo(Full256<float> /* tag */,
+                                 const Vec256<int32_t> v) {
+@@ -2421,13 +2464,20 @@ HWY_API Vec256<double> ConvertTo(Full256
+   (void)dd;
+   return Vec256<double>{_mm256_cvtepi64_pd(v.raw)};
+ #else
+-  alignas(32) int64_t lanes_i[4];
+-  Store(v, Full256<int64_t>(), lanes_i);
+-  alignas(32) double lanes_d[4];
+-  for (size_t i = 0; i < 4; ++i) {
+-    lanes_d[i] = static_cast<double>(lanes_i[i]);
+-  }
+-  return Load(dd, lanes_d);
++  // Based on wim's approach (https://stackoverflow.com/questions/41144668/)
++  const Repartition<uint32_t, decltype(dd)> d32;
++  const Repartition<uint64_t, decltype(dd)> d64;
++
++  // Toggle MSB of lower 32-bits and insert exponent for 2^84 + 2^63
++  const auto k84_63 = Set(d64, 0x4530000080000000ULL);
++  const auto v_upper = BitCast(dd, ShiftRight<32>(BitCast(d64, v)) ^ k84_63);
++
++  // Exponent is 2^52, lower 32 bits from v (=> 32-bit OddEven)
++  const auto k52 = Set(d32, 0x43300000);
++  const auto v_lower = BitCast(dd, OddEven(k52, BitCast(d32, v)));
++
++  const auto k84_63_52 = BitCast(dd, Set(d64, 0x4530000080100000ULL));
++  return (v_upper - k84_63_52) + v_lower;  // order matters!
+ #endif
+ }
+ 
+@@ -2502,8 +2552,7 @@ HWY_API uint64_t BitsFromMask(hwy::SizeT
+   const auto compressed =
+       _mm256_permute4x64_epi64(sign_bits, _MM_SHUFFLE(3, 1, 2, 0));
+   return static_cast<unsigned>(_mm256_movemask_epi8(compressed));
+-
+-#endif
++#endif  // HWY_ARCH_X86_64
+ }
+ 
+ template <typename T>
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/targets.cc.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/targets.cc
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/targets.cc.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/targets.cc	2021-07-26 17:17:24.610482240 -0400
+@@ -32,8 +32,8 @@
+ #include <intrin.h>
+ #else  // HWY_COMPILER_MSVC
+ #include <cpuid.h>
+-#endif // HWY_COMPILER_MSVC
+-#endif
++#endif  // HWY_COMPILER_MSVC
++#endif  // HWY_ARCH_X86
+ 
+ namespace hwy {
+ namespace {
+@@ -126,7 +126,7 @@ constexpr uint32_t kAVX512VL = 1u << 13;
+ constexpr uint32_t kAVX512DQ = 1u << 14;
+ constexpr uint32_t kAVX512BW = 1u << 15;
+ constexpr uint32_t kGroupAVX3 = kAVX512F | kAVX512VL | kAVX512DQ | kAVX512BW;
+-#endif
++#endif  // HWY_ARCH_X86
+ 
+ }  // namespace
+ 
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/targets.h.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/targets.h
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/targets.h.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/targets.h	2021-07-26 17:17:24.610482240 -0400
+@@ -65,7 +65,9 @@
+ // HWY_MAX_DYNAMIC_TARGETS in total.
+ #define HWY_HIGHEST_TARGET_BIT_X86 9
+ 
+-// 0x400, 0x800, 0x1000 reserved for SVE, SVE2, Helium
++#define HWY_SVE2 0x400
++#define HWY_SVE 0x800
++// 0x1000 reserved for Helium
+ #define HWY_NEON 0x2000
+ 
+ #define HWY_HIGHEST_TARGET_BIT_ARM 13
+@@ -90,6 +92,9 @@
+ // 0x2000000, 0x4000000, 0x8000000, 0x10000000 reserved
+ 
+ #define HWY_SCALAR 0x20000000
++
++#define HWY_HIGHEST_TARGET_BIT_SCALAR 29
++
+ // Cannot use higher values, otherwise HWY_TARGETS computation might overflow.
+ 
+ //------------------------------------------------------------------------------
+@@ -106,25 +111,26 @@
+ #ifndef HWY_BROKEN_TARGETS
+ 
+ // x86 clang-6: we saw multiple AVX2/3 compile errors and in one case invalid
+-// SSE4 codegen (msan failure), so disable all those targets.
++// SSE4 codegen (possibly only for msan), so disable all those targets.
+ #if HWY_ARCH_X86 && (HWY_COMPILER_CLANG != 0 && HWY_COMPILER_CLANG < 700)
+-// TODO: Disable all non-scalar targets for every build target once we have
+-// clang-7 enabled in our builders.
+-#ifdef MEMORY_SANITIZER
+ #define HWY_BROKEN_TARGETS (HWY_SSE4 | HWY_AVX2 | HWY_AVX3)
+-#else
+-#define HWY_BROKEN_TARGETS 0
+-#endif
+ // This entails a major speed reduction, so warn unless the user explicitly
+ // opts in to scalar-only.
+ #if !defined(HWY_COMPILE_ONLY_SCALAR)
+ #pragma message("x86 Clang <= 6: define HWY_COMPILE_ONLY_SCALAR or upgrade.")
+ #endif
+ 
+-// MSVC, or 32-bit may fail to compile AVX2/3.
+-#elif HWY_COMPILER_MSVC != 0 || HWY_ARCH_X86_32
++// 32-bit may fail to compile AVX2/3.
++#elif HWY_ARCH_X86_32
+ #define HWY_BROKEN_TARGETS (HWY_AVX2 | HWY_AVX3)
+-#pragma message("Disabling AVX2/3 due to known issues with MSVC/32-bit builds")
++
++// MSVC AVX3 support is buggy: https://github.com/Mysticial/Flops/issues/16
++#elif HWY_COMPILER_MSVC != 0
++#define HWY_BROKEN_TARGETS (HWY_AVX3)
++
++// armv7be has not been tested and is not yet supported.
++#elif HWY_ARCH_ARM_V7 && (defined(__ARM_BIG_ENDIAN) || defined(__BIG_ENDIAN))
++#define HWY_BROKEN_TARGETS (HWY_NEON)
+ 
+ #else
+ #define HWY_BROKEN_TARGETS 0
+@@ -145,53 +151,74 @@
+ // user to override this without any guarantee of success.
+ #ifndef HWY_BASELINE_TARGETS
+ 
+-#ifdef __wasm_simd128__
++// Also check HWY_ARCH to ensure that simulating unknown platforms ends up with
++// HWY_TARGET == HWY_SCALAR.
++
++#if HWY_ARCH_WASM && defined(__wasm_simd128__)
+ #define HWY_BASELINE_WASM HWY_WASM
+ #else
+ #define HWY_BASELINE_WASM 0
+ #endif
+ 
+-#ifdef __VSX__
++// Avoid choosing the PPC target until we have an implementation.
++#if HWY_ARCH_PPC && defined(__VSX__) && 0
+ #define HWY_BASELINE_PPC8 HWY_PPC8
+ #else
+ #define HWY_BASELINE_PPC8 0
+ #endif
+ 
+-// GCC 4.5.4 only defines the former; 5.4 defines both.
+-#if defined(__ARM_NEON__) || defined(__ARM_NEON)
++// Avoid choosing the SVE[2] targets the implementation is ready.
++#if HWY_ARCH_ARM && defined(__ARM_FEATURE_SVE2) && 0
++#define HWY_BASELINE_SVE2 HWY_SVE2
++#else
++#define HWY_BASELINE_SVE2 0
++#endif
++
++#if HWY_ARCH_ARM && defined(__ARM_FEATURE_SVE) && 0
++#define HWY_BASELINE_SVE HWY_SVE
++#else
++#define HWY_BASELINE_SVE 0
++#endif
++
++// GCC 4.5.4 only defines __ARM_NEON__; 5.4 defines both.
++#if HWY_ARCH_ARM && (defined(__ARM_NEON__) || defined(__ARM_NEON))
+ #define HWY_BASELINE_NEON HWY_NEON
+ #else
+ #define HWY_BASELINE_NEON 0
+ #endif
+ 
+-#ifdef __SSE4_1__
++// MSVC does not set SSE4_1, but it does set AVX; checking for the latter means
++// we at least get SSE4 on machines supporting AVX but not AVX2.
++// https://stackoverflow.com/questions/18563978/
++#if HWY_ARCH_X86 && \
++    (defined(__SSE4_1__) || (HWY_COMPILER_MSVC != 0 && defined(__AVX__)))
+ #define HWY_BASELINE_SSE4 HWY_SSE4
+ #else
+ #define HWY_BASELINE_SSE4 0
+ #endif
+ 
+-#ifdef __AVX2__
++#if HWY_ARCH_X86 && defined(__AVX2__)
+ #define HWY_BASELINE_AVX2 HWY_AVX2
+ #else
+ #define HWY_BASELINE_AVX2 0
+ #endif
+ 
+-#ifdef __AVX512F__
++#if HWY_ARCH_X86 && defined(__AVX512F__)
+ #define HWY_BASELINE_AVX3 HWY_AVX3
+ #else
+ #define HWY_BASELINE_AVX3 0
+ #endif
+ 
+-#ifdef __riscv_vector
++#if HWY_ARCH_RVV && defined(__riscv_vector)
+ #define HWY_BASELINE_RVV HWY_RVV
+ #else
+ #define HWY_BASELINE_RVV 0
+ #endif
+ 
+ #define HWY_BASELINE_TARGETS                                                \
+-  (HWY_SCALAR | HWY_BASELINE_WASM | HWY_BASELINE_PPC8 | HWY_BASELINE_NEON | \
+-   HWY_BASELINE_SSE4 | HWY_BASELINE_AVX2 | HWY_BASELINE_AVX3 |              \
+-   HWY_BASELINE_RVV)
++  (HWY_SCALAR | HWY_BASELINE_WASM | HWY_BASELINE_PPC8 | HWY_BASELINE_SVE2 | \
++   HWY_BASELINE_SVE | HWY_BASELINE_NEON | HWY_BASELINE_SSE4 |               \
++   HWY_BASELINE_AVX2 | HWY_BASELINE_AVX3 | HWY_BASELINE_RVV)
+ 
+ #endif  // HWY_BASELINE_TARGETS
+ 
+@@ -242,13 +269,12 @@
+ #define HWY_TARGETS HWY_STATIC_TARGET
+ 
+ // 3) For tests: include all attainable targets (in particular: scalar)
+-#elif defined(HWY_COMPILE_ALL_ATTAINABLE)
++#elif defined(HWY_COMPILE_ALL_ATTAINABLE) || defined(HWY_IS_TEST)
+ #define HWY_TARGETS HWY_ATTAINABLE_TARGETS
+ 
+ // 4) Default: attainable WITHOUT non-best baseline. This reduces code size by
+ // excluding superseded targets, in particular scalar.
+ #else
+-
+ #define HWY_TARGETS (HWY_ATTAINABLE_TARGETS & (2 * HWY_STATIC_TARGET - 1))
+ 
+ #endif  // target policy
+@@ -323,6 +349,10 @@ static inline HWY_MAYBE_UNUSED const cha
+ #endif
+ 
+ #if HWY_ARCH_ARM
++    case HWY_SVE2:
++      return "SVE2";
++    case HWY_SVE:
++      return "SVE";
+     case HWY_NEON:
+       return "Neon";
+ #endif
+@@ -346,7 +376,7 @@ static inline HWY_MAYBE_UNUSED const cha
+       return "Scalar";
+ 
+     default:
+-      return "?";
++      return "Unknown";  // must satisfy gtest IsValidParamName()
+   }
+ }
+ 
+@@ -405,21 +435,17 @@ static inline HWY_MAYBE_UNUSED const cha
+       nullptr,                    /* SSE3 */     \
+       nullptr                     /* SSE2 */
+ 
+-#endif  // HWY_ARCH_X86
+-
+-#if HWY_ARCH_ARM
++#elif HWY_ARCH_ARM
+ // See HWY_ARCH_X86 above for details.
+ #define HWY_MAX_DYNAMIC_TARGETS 4
+ #define HWY_HIGHEST_TARGET_BIT HWY_HIGHEST_TARGET_BIT_ARM
+ #define HWY_CHOOSE_TARGET_LIST(func_name)       \
+-  nullptr,                       /* reserved */ \
+-      nullptr,                   /* reserved */ \
++  HWY_CHOOSE_SVE2(func_name),    /* SVE2 */     \
++      HWY_CHOOSE_SVE(func_name), /* SVE */      \
+       nullptr,                   /* reserved */ \
+       HWY_CHOOSE_NEON(func_name) /* NEON */
+ 
+-#endif  // HWY_ARCH_ARM
+-
+-#if HWY_ARCH_PPC
++#elif HWY_ARCH_PPC
+ // See HWY_ARCH_X86 above for details.
+ #define HWY_MAX_DYNAMIC_TARGETS 5
+ #define HWY_HIGHEST_TARGET_BIT HWY_HIGHEST_TARGET_BIT_PPC
+@@ -430,9 +456,7 @@ static inline HWY_MAYBE_UNUSED const cha
+       nullptr,                    /* VSX */      \
+       nullptr                     /* AltiVec */
+ 
+-#endif  // HWY_ARCH_PPC
+-
+-#if HWY_ARCH_WASM
++#elif HWY_ARCH_WASM
+ // See HWY_ARCH_X86 above for details.
+ #define HWY_MAX_DYNAMIC_TARGETS 4
+ #define HWY_HIGHEST_TARGET_BIT HWY_HIGHEST_TARGET_BIT_WASM
+@@ -442,9 +466,7 @@ static inline HWY_MAYBE_UNUSED const cha
+       nullptr,                   /* reserved */ \
+       HWY_CHOOSE_WASM(func_name) /* WASM */
+ 
+-#endif  // HWY_ARCH_WASM
+-
+-#if HWY_ARCH_RVV
++#elif HWY_ARCH_RVV
+ // See HWY_ARCH_X86 above for details.
+ #define HWY_MAX_DYNAMIC_TARGETS 4
+ #define HWY_HIGHEST_TARGET_BIT HWY_HIGHEST_TARGET_BIT_RVV
+@@ -454,7 +476,12 @@ static inline HWY_MAYBE_UNUSED const cha
+       nullptr,                   /* reserved */ \
+       HWY_CHOOSE_RVV(func_name) /* RVV */
+ 
+-#endif  // HWY_ARCH_RVV
++#else
++// Unknown architecture, will use HWY_SCALAR without dynamic dispatch, though
++// still creating single-entry tables in HWY_EXPORT to ensure portability.
++#define HWY_MAX_DYNAMIC_TARGETS 1
++#define HWY_HIGHEST_TARGET_BIT HWY_HIGHEST_TARGET_BIT_SCALAR
++#endif
+ 
+ struct ChosenTarget {
+  public:
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/tests/memory_test.cc.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/tests/memory_test.cc
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/tests/memory_test.cc.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/tests/memory_test.cc	2021-07-26 17:10:40.022319820 -0400
+@@ -12,6 +12,12 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++// Ensure incompabilities with Windows macros (e.g. #define StoreFence) are
++// detected. Must come before Highway headers.
++#if defined(_WIN32) || defined(_WIN64)
++#include <Windows.h>
++#endif
++
+ #include <stddef.h>
+ #include <stdint.h>
+ 
+@@ -199,13 +205,14 @@ struct TestLoadDup128 {
+     for (size_t i = 0; i < N128; ++i) {
+       lanes[i] = static_cast<T>(1 + i);
+     }
+-    const auto v = LoadDup128(d, lanes);
++
+     const size_t N = Lanes(d);
+-    auto out = AllocateAligned<T>(N);
+-    Store(v, d, out.get());
++    auto expected = AllocateAligned<T>(N);
+     for (size_t i = 0; i < N; ++i) {
+-      HWY_ASSERT_EQ(T(i % N128 + 1), out[i]);
++      expected[i] = static_cast<T>(i % N128 + 1);
+     }
++
++    HWY_ASSERT_VEC_EQ(d, expected.get(), LoadDup128(d, lanes));
+ #else
+     (void)d;
+ #endif
+@@ -327,6 +334,84 @@ HWY_NOINLINE void TestAllScatter() {
+   ForFloatTypes(test);
+ }
+ 
++// Assumes little-endian byte order!
++struct TestScatter {
++  template <class T, class D>
++  HWY_NOINLINE void operator()(T /*unused*/, D d) {
++    using Offset = MakeSigned<T>;
++
++    const size_t N = Lanes(d);
++    const size_t range = 4 * N;                  // number of items to scatter
++    const size_t max_bytes = range * sizeof(T);  // upper bound on offset
++
++    RandomState rng;
++
++    // Data to be scattered
++    auto bytes = AllocateAligned<uint8_t>(max_bytes);
++    for (size_t i = 0; i < max_bytes; ++i) {
++      bytes[i] = static_cast<uint8_t>(Random32(&rng) & 0xFF);
++    }
++    const auto data = Load(d, reinterpret_cast<const T*>(bytes.get()));
++
++    // Scatter into these regions, ensure vector results match scalar
++    auto expected = AllocateAligned<T>(range);
++    auto actual = AllocateAligned<T>(range);
++
++    const Rebind<Offset, D> d_offsets;
++    auto offsets = AllocateAligned<Offset>(N);  // or indices
++
++    for (size_t rep = 0; rep < 100; ++rep) {
++      // Byte offsets
++      std::fill(expected.get(), expected.get() + range, T(0));
++      std::fill(actual.get(), actual.get() + range, T(0));
++      for (size_t i = 0; i < N; ++i) {
++        offsets[i] =
++            static_cast<Offset>(Random32(&rng) % (max_bytes - sizeof(T)));
++        CopyBytes<sizeof(T)>(
++            bytes.get() + i * sizeof(T),
++            reinterpret_cast<uint8_t*>(expected.get()) + offsets[i]);
++      }
++      const auto voffsets = Load(d_offsets, offsets.get());
++      ScatterOffset(data, d, actual.get(), voffsets);
++      if (!BytesEqual(expected.get(), actual.get(), max_bytes)) {
++        Print(d, "Data", data);
++        Print(d_offsets, "Offsets", voffsets);
++        HWY_ASSERT(false);
++      }
++
++      // Indices
++      std::fill(expected.get(), expected.get() + range, T(0));
++      std::fill(actual.get(), actual.get() + range, T(0));
++      for (size_t i = 0; i < N; ++i) {
++        offsets[i] = static_cast<Offset>(Random32(&rng) % range);
++        CopyBytes<sizeof(T)>(bytes.get() + i * sizeof(T),
++                             &expected[offsets[i]]);
++      }
++      const auto vindices = Load(d_offsets, offsets.get());
++      ScatterIndex(data, d, actual.get(), vindices);
++      if (!BytesEqual(expected.get(), actual.get(), max_bytes)) {
++        Print(d, "Data", data);
++        Print(d_offsets, "Indices", vindices);
++        HWY_ASSERT(false);
++      }
++    }
++  }
++};
++
++HWY_NOINLINE void TestAllScatter() {
++  // No u8,u16,i8,i16.
++  const ForPartialVectors<TestScatter> test;
++  test(uint32_t());
++  test(int32_t());
++
++#if HWY_CAP_INTEGER64
++  test(uint64_t());
++  test(int64_t());
++#endif
++
++  ForFloatTypes(test);
++}
++
+ struct TestGather {
+   template <class T, class D>
+   HWY_NOINLINE void operator()(T /*unused*/, D d) {
+@@ -391,6 +476,7 @@ HWY_NOINLINE void TestAllCache() {
+   int test = 0;
+   Prefetch(&test);
+   FlushCacheline(&test);
++  Pause();
+ }
+ 
+ // NOLINTNEXTLINE(google-readability-namespace-comments)
+diff -up chromium-92.0.4515.107/third_party/highway/src/hwy/tests/swizzle_test.cc.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/hwy/tests/swizzle_test.cc
+--- chromium-92.0.4515.107/third_party/highway/src/hwy/tests/swizzle_test.cc.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/hwy/tests/swizzle_test.cc	2021-07-26 17:10:40.023319835 -0400
+@@ -223,6 +223,7 @@ struct TestTableLookupBytes {
+ HWY_NOINLINE void TestAllTableLookupBytes() {
+   ForIntegerTypes(ForPartialVectors<TestTableLookupBytes>());
+ }
++
+ struct TestTableLookupLanes {
+ #if HWY_TARGET == HWY_RVV
+   using Index = uint32_t;
+@@ -242,12 +243,13 @@ struct TestTableLookupLanes {
+     if (N <= 8) {  // Test all permutations
+       for (size_t i0 = 0; i0 < N; ++i0) {
+         idx[0] = static_cast<Index>(i0);
++
+         for (size_t i1 = 0; i1 < N; ++i1) {
+-          idx[1] = static_cast<Index>(i1);
++          if (N >= 2) idx[1] = static_cast<Index>(i1);
+           for (size_t i2 = 0; i2 < N; ++i2) {
+-            idx[2] = static_cast<Index>(i2);
++            if (N >= 4) idx[2] = static_cast<Index>(i2);
+             for (size_t i3 = 0; i3 < N; ++i3) {
+-              idx[3] = static_cast<Index>(i3);
++              if (N >= 4) idx[3] = static_cast<Index>(i3);
+ 
+               for (size_t i = 0; i < N; ++i) {
+                 expected[i] = static_cast<T>(idx[i] + 1);  // == v[idx[i]]
+@@ -286,7 +288,7 @@ struct TestTableLookupLanes {
+ };
+ 
+ HWY_NOINLINE void TestAllTableLookupLanes() {
+-  const ForFullVectors<TestTableLookupLanes> test;
++  const ForPartialVectors<TestTableLookupLanes> test;
+   test(uint32_t());
+   test(int32_t());
+   test(float());
+diff -up chromium-92.0.4515.107/third_party/highway/src/README.md.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/README.md
+--- chromium-92.0.4515.107/third_party/highway/src/README.md.update-highway-0.12.2	2021-07-26 17:10:40.838332249 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/README.md	2021-07-26 17:15:00.832292309 -0400
+@@ -15,7 +15,7 @@ applying the same operation to 'lanes'.
+ ## Current status
+ 
+ Supported targets: scalar, SSE4, AVX2, AVX-512, NEON (ARMv7 and v8), WASM SIMD.
+-A port to RVV is in progress.
++Ports to RVV and SVE/SVE2 are in progress.
+ 
+ Version 0.11 is considered stable enough to use in other projects, and is
+ expected to remain backwards compatible unless serious issues are discovered
+@@ -23,8 +23,11 @@ while implementing SVE/RVV targets. Afte
+ reach version 1.0.
+ 
+ Continuous integration tests build with a recent version of Clang (running on
+-x86 and QEMU for ARM) and MSVC from VS2015 (running on x86). Also periodically
+-tested on x86 with Clang 7-11 and GCC 8, 9 and 10.2.1.
++x86 and QEMU for ARM) and MSVC from VS2015 (running on x86).
++
++Before releases, we also test on x86 with Clang and GCC, and ARMv7/8 via
++GCC cross-compile and QEMU. See the
++[testing process](g3doc/release_testing_process.md) for details.
+ 
+ The `contrib` directory contains SIMD-related utilities: an image class with
+ aligned rows, and a math library (16 functions already implemented, mostly
+@@ -63,6 +66,8 @@ To test on all the attainable targets fo
+ default configuration skips baseline targets (e.g. scalar) that are superseded
+ by another baseline target.
+ 
++Bazel is also supported for building, but it is not as widely used/tested.
++
+ ## Quick start
+ 
+ You can use the `benchmark` inside examples/ as a starting point.
+diff -up chromium-92.0.4515.107/third_party/highway/src/run_tests.bat.update-highway-0.12.2 chromium-92.0.4515.107/third_party/highway/src/run_tests.bat
+--- chromium-92.0.4515.107/third_party/highway/src/run_tests.bat.update-highway-0.12.2	2021-07-19 14:47:23.000000000 -0400
++++ chromium-92.0.4515.107/third_party/highway/src/run_tests.bat	2021-07-26 17:14:47.466088723 -0400
+@@ -2,9 +2,9 @@
+ REM Switch directory of this batch file
+ cd %~dp0
+ 
+-if not exist build mkdir build
++if not exist build_win mkdir build_win
+ 
+-cd build
++cd build_win
+ cmake .. -G Ninja || goto error
+ ninja || goto error
+ ctest -j || goto error

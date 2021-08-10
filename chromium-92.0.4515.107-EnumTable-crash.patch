@@ -1,7 +1,6 @@
-diff --git a/components/cast_channel/enum_table.h b/components/cast_channel/enum_table.h
-index e3130c7..2ad16ea 100644
---- a/components/cast_channel/enum_table.h
-+++ b/components/cast_channel/enum_table.h
+diff -up chromium-92.0.4515.107/components/cast_channel/enum_table.h.EnumTable-crash chromium-92.0.4515.107/components/cast_channel/enum_table.h
+--- chromium-92.0.4515.107/components/cast_channel/enum_table.h.EnumTable-crash	2021-07-19 14:45:12.000000000 -0400
++++ chromium-92.0.4515.107/components/cast_channel/enum_table.h	2021-07-26 17:41:21.987375385 -0400
 @@ -212,7 +212,7 @@ class
  
    template <typename E>
@@ -30,7 +29,7 @@ index e3130c7..2ad16ea 100644
          if (ANALYZER_ASSUME_TRUE(entry.has_str()))
            return entry.str();
        }
-       return base::nullopt;
+       return absl::nullopt;
      }
      return GenericEnumTableEntry::FindByValue(
 -        reinterpret_cast<const GenericEnumTableEntry*>(data_.begin()),
@@ -41,12 +40,12 @@ index e3130c7..2ad16ea 100644
    // This overload of GetString is designed for cases where the argument is a
 @@ -342,8 +340,7 @@ class EnumTable {
    // enum value directly.
-   base::Optional<E> GetEnum(base::StringPiece str) const {
+   absl::optional<E> GetEnum(base::StringPiece str) const {
      auto* entry = GenericEnumTableEntry::FindByString(
 -        reinterpret_cast<const GenericEnumTableEntry*>(data_.begin()),
 -        data_.size(), str);
 +        &data_[0], data_.size(), str);
-     return entry ? static_cast<E>(entry->value) : base::Optional<E>();
+     return entry ? static_cast<E>(entry->value) : absl::optional<E>();
    }
  
 @@ -358,7 +355,7 @@ class EnumTable {

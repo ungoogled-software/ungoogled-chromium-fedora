@@ -1,9 +1,9 @@
-diff -up chromium-89.0.4389.72/chrome/common/chrome_paths.cc.widevine-other-locations chromium-89.0.4389.72/chrome/common/chrome_paths.cc
---- chromium-89.0.4389.72/chrome/common/chrome_paths.cc.widevine-other-locations	2021-03-04 12:04:50.005010200 -0500
-+++ chromium-89.0.4389.72/chrome/common/chrome_paths.cc	2021-03-04 12:38:54.650855614 -0500
-@@ -339,6 +339,16 @@ bool PathProvider(int key, base::FilePat
- #if (defined(OS_LINUX) || defined(OS_CHROMEOS)) && \
-     BUILDFLAG(BUNDLE_WIDEVINE_CDM)
+diff -up chromium-92.0.4515.107/chrome/common/chrome_paths.cc.widevine-other-locations chromium-92.0.4515.107/chrome/common/chrome_paths.cc
+--- chromium-92.0.4515.107/chrome/common/chrome_paths.cc.widevine-other-locations	2021-07-26 16:50:41.815065696 -0400
++++ chromium-92.0.4515.107/chrome/common/chrome_paths.cc	2021-07-26 16:58:08.334868284 -0400
+@@ -313,6 +313,16 @@ bool PathProvider(int key, base::FilePat
+ 
+ #if BUILDFLAG(ENABLE_WIDEVINE)
      case chrome::DIR_BUNDLED_WIDEVINE_CDM:
 +      base::PathService::Get(base::DIR_HOME, &cur);
 +      cur = cur.Append(FILE_PATH_LITERAL(".local/lib/libwidevinecdm.so"));

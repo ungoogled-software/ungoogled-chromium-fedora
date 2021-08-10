@@ -1,6 +1,6 @@
-diff -up chromium-89.0.4389.72/chrome/common/safe_browsing/BUILD.gn.nounrar chromium-89.0.4389.72/chrome/common/safe_browsing/BUILD.gn
---- chromium-89.0.4389.72/chrome/common/safe_browsing/BUILD.gn.nounrar	2021-03-02 12:45:06.000000000 -0500
-+++ chromium-89.0.4389.72/chrome/common/safe_browsing/BUILD.gn	2021-03-04 11:56:21.676563769 -0500
+diff -up chromium-92.0.4515.107/chrome/common/safe_browsing/BUILD.gn.nounrar chromium-92.0.4515.107/chrome/common/safe_browsing/BUILD.gn
+--- chromium-92.0.4515.107/chrome/common/safe_browsing/BUILD.gn.nounrar	2021-07-19 14:45:10.000000000 -0400
++++ chromium-92.0.4515.107/chrome/common/safe_browsing/BUILD.gn	2021-07-26 16:44:53.670761825 -0400
 @@ -43,39 +43,6 @@ if (safe_browsing_mode == 1) {
      public_deps = [ "//components/safe_browsing/core:csd_proto" ]
    }
@@ -49,9 +49,9 @@ diff -up chromium-89.0.4389.72/chrome/common/safe_browsing/BUILD.gn.nounrar chro
        "//components/safe_browsing/core:features",
      ]
  
-diff -up chromium-89.0.4389.72/chrome/common/safe_browsing/DEPS.nounrar chromium-89.0.4389.72/chrome/common/safe_browsing/DEPS
---- chromium-89.0.4389.72/chrome/common/safe_browsing/DEPS.nounrar	2021-03-02 12:45:06.000000000 -0500
-+++ chromium-89.0.4389.72/chrome/common/safe_browsing/DEPS	2021-03-04 11:56:21.676563769 -0500
+diff -up chromium-92.0.4515.107/chrome/common/safe_browsing/DEPS.nounrar chromium-92.0.4515.107/chrome/common/safe_browsing/DEPS
+--- chromium-92.0.4515.107/chrome/common/safe_browsing/DEPS.nounrar	2021-07-19 14:45:10.000000000 -0400
++++ chromium-92.0.4515.107/chrome/common/safe_browsing/DEPS	2021-07-26 16:44:53.670761825 -0400
 @@ -1,6 +1,5 @@
  include_rules = [
    "+components/safe_browsing",
@@ -59,20 +59,20 @@ diff -up chromium-89.0.4389.72/chrome/common/safe_browsing/DEPS.nounrar chromium
 -  "+third_party/unrar",
    "+third_party/zlib",
  ]
-diff -up chromium-89.0.4389.72/chrome/services/file_util/BUILD.gn.nounrar chromium-89.0.4389.72/chrome/services/file_util/BUILD.gn
---- chromium-89.0.4389.72/chrome/services/file_util/BUILD.gn.nounrar	2021-03-04 11:56:21.676563769 -0500
-+++ chromium-89.0.4389.72/chrome/services/file_util/BUILD.gn	2021-03-04 11:57:38.583933453 -0500
-@@ -17,7 +17,6 @@ source_set("file_util") {
-     "//build:chromeos_buildflags",
-     "//chrome/common/safe_browsing",
-     "//chrome/common/safe_browsing:archive_analyzer_results",
--    "//chrome/common/safe_browsing:rar_analyzer",
-     "//components/safe_browsing:buildflags",
-     "//mojo/public/cpp/bindings",
-   ]
-diff -up chromium-89.0.4389.72/chrome/services/file_util/safe_archive_analyzer.cc.nounrar chromium-89.0.4389.72/chrome/services/file_util/safe_archive_analyzer.cc
---- chromium-89.0.4389.72/chrome/services/file_util/safe_archive_analyzer.cc.nounrar	2021-03-02 12:45:06.000000000 -0500
-+++ chromium-89.0.4389.72/chrome/services/file_util/safe_archive_analyzer.cc	2021-03-04 11:56:21.677563774 -0500
+diff -up chromium-92.0.4515.107/chrome/services/file_util/BUILD.gn.nounrar chromium-92.0.4515.107/chrome/services/file_util/BUILD.gn
+--- chromium-92.0.4515.107/chrome/services/file_util/BUILD.gn.nounrar	2021-07-26 16:44:53.670761825 -0400
++++ chromium-92.0.4515.107/chrome/services/file_util/BUILD.gn	2021-07-26 16:48:21.283924750 -0400
+@@ -50,7 +50,6 @@ source_set("file_util") {
+     deps += [
+       "//chrome/common/safe_browsing",
+       "//chrome/common/safe_browsing:archive_analyzer_results",
+-      "//chrome/common/safe_browsing:rar_analyzer",
+     ]
+   }
+ 
+diff -up chromium-92.0.4515.107/chrome/services/file_util/safe_archive_analyzer.cc.nounrar chromium-92.0.4515.107/chrome/services/file_util/safe_archive_analyzer.cc
+--- chromium-92.0.4515.107/chrome/services/file_util/safe_archive_analyzer.cc.nounrar	2021-07-19 14:45:11.000000000 -0400
++++ chromium-92.0.4515.107/chrome/services/file_util/safe_archive_analyzer.cc	2021-07-26 16:44:53.670761825 -0400
 @@ -45,10 +45,14 @@ void SafeArchiveAnalyzer::AnalyzeDmgFile
  void SafeArchiveAnalyzer::AnalyzeRarFile(base::File rar_file,
                                           base::File temporary_file,

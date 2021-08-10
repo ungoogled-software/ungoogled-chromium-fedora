@@ -1,7 +1,7 @@
-diff -up chromium-91.0.4472.114/components/ui_devtools/views/view_element.cc.erase-fix chromium-91.0.4472.114/components/ui_devtools/views/view_element.cc
---- chromium-91.0.4472.114/components/ui_devtools/views/view_element.cc.erase-fix	2021-06-28 13:47:06.751802159 -0400
-+++ chromium-91.0.4472.114/components/ui_devtools/views/view_element.cc	2021-06-28 13:47:20.097876929 -0400
-@@ -24,14 +24,14 @@ namespace {
+diff -up chromium-90.0.4430.93/components/ui_devtools/views/view_element.cc.erase-fix chromium-90.0.4430.93/components/ui_devtools/views/view_element.cc
+--- chromium-90.0.4430.93/components/ui_devtools/views/view_element.cc.erase-fix	2021-04-29 14:00:38.779932160 -0400
++++ chromium-90.0.4430.93/components/ui_devtools/views/view_element.cc	2021-04-29 14:00:54.684194321 -0400
+@@ -23,14 +23,14 @@ namespace {
  // Remove any custom editor "prefixes" from the property name. The prefixes must
  // not be valid identifier characters.
  void StripPrefix(std::string& property_name) {
@@ -17,4 +17,4 @@ diff -up chromium-91.0.4472.114/components/ui_devtools/views/view_element.cc.era
 +  property_name.erase(property_name.begin(), cur);
  }
  
- ui::EventType GetMouseEventType(const std::string& type) {
+ }  // namespace
