@@ -320,6 +320,8 @@ Patch300:	chromium-92.0.4515.107-rhel8-force-disable-use_gnome_keyring.patch
 
 # And fixes for new compilers
 Patch400:       chromium-gcc11.patch
+# Fix Blink ignoring use_allocator flag
+Patch401:       chromium-92.0.4515.131-centos-no-partition-malloc.patch
 
 # RPM Fusion patches [free/chromium-freeworld]:
 Patch503:       chromium-manpage.patch
@@ -795,6 +797,9 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch300 -p1 -b .disblegnomekeyring
 
 %patch400 -p1 -b .gcc11
+%if 0%{?rhel} >= 7
+%patch401 -p1 -b .partition-malloc
+%endif
 
 # RPM Fusion patches [free/chromium-freeworld]:
 %patch503 -p1 -b .manpage

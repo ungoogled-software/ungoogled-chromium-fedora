@@ -100,8 +100,8 @@ diff -up chromium-84.0.4147.89/printing/backend/cups_helper.cc.el7cups chromium-
 diff -up chromium-84.0.4147.89/printing/backend/cups_helper.h.el7cups chromium-84.0.4147.89/printing/backend/cups_helper.h
 --- chromium-84.0.4147.89/printing/backend/cups_helper.h.el7cups	2020-07-13 14:41:27.000000000 -0400
 +++ chromium-84.0.4147.89/printing/backend/cups_helper.h	2020-07-15 10:16:30.486337271 -0400
-@@ -23,10 +23,11 @@ struct PrinterSemanticCapsAndDefaults;
- class PRINTING_EXPORT HttpConnectionCUPS {
+@@ -22,10 +22,11 @@
+ class COMPONENT_EXPORT(PRINT_BACKEND) HttpConnectionCUPS {
   public:
    HttpConnectionCUPS(const GURL& print_server_url,
 -                     http_encryption_t encryption,
@@ -117,17 +117,17 @@ diff -up chromium-84.0.4147.89/printing/backend/cups_helper.h.el7cups chromium-8
 diff -up chromium-84.0.4147.89/printing/backend/print_backend_cups.cc.el7cups chromium-84.0.4147.89/printing/backend/print_backend_cups.cc
 --- chromium-84.0.4147.89/printing/backend/print_backend_cups.cc.el7cups	2020-07-13 14:41:27.000000000 -0400
 +++ chromium-84.0.4147.89/printing/backend/print_backend_cups.cc	2020-07-15 10:16:30.487337255 -0400
-@@ -250,7 +250,8 @@ int PrintBackendCUPS::GetDests(cups_dest
+@@ -284,7 +284,8 @@
    if (print_server_url_.is_empty())
      return cupsGetDests2(CUPS_HTTP_DEFAULT, dests);
- 
+
 -  HttpConnectionCUPS http(print_server_url_, cups_encryption_, blocking_);
 +  HttpConnectionCUPS http(print_server_url_, cups_encryption_);
 +  http.SetBlocking(blocking_);
- 
-   // This call must be made in the same scope as |http| because its destructor
+
+   // This call must be made in the same scope as `http` because its destructor
    // closes the connection.
-@@ -276,7 +277,8 @@ base::FilePath PrintBackendCUPS::GetPPD(
+@@ -310,7 +311,8 @@
      // connection will timeout after 10 seconds of no data period. And it will
      // return the same way as if data was completely and successfully
      // downloaded.
@@ -137,7 +137,7 @@ diff -up chromium-84.0.4147.89/printing/backend/print_backend_cups.cc.el7cups ch
      ppd_file_path = cupsGetPPD2(http.http(), name);
      // Check if the get full PPD, since non-blocking call may simply return
      // normally after timeout expired.
-@@ -312,7 +314,8 @@ PrintBackendCUPS::ScopedDestination Prin
+@@ -346,7 +348,8 @@
      // Use default (local) print server.
      dest = cupsGetNamedDest(CUPS_HTTP_DEFAULT, printer_name.c_str(), nullptr);
    } else {

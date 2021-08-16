@@ -114,12 +114,12 @@ diff -up chromium-90.0.4430.93/sandbox/linux/seccomp-bpf-helpers/syscall_paramet
 diff -up chromium-90.0.4430.93/ui/events/ozone/evdev/event_converter_evdev_impl.cc.epel7-kcmp chromium-90.0.4430.93/ui/events/ozone/evdev/event_converter_evdev_impl.cc
 --- chromium-90.0.4430.93/ui/events/ozone/evdev/event_converter_evdev_impl.cc.epel7-kcmp	2021-04-28 09:55:12.941124592 -0400
 +++ chromium-90.0.4430.93/ui/events/ozone/evdev/event_converter_evdev_impl.cc	2021-04-28 09:55:42.071601437 -0400
-@@ -16,6 +16,10 @@
- #include "ui/events/keycodes/dom/keycode_converter.h"
+@@ -17,6 +17,10 @@
  #include "ui/events/ozone/evdev/device_event_dispatcher_evdev.h"
- 
+ #include "ui/events/ozone/evdev/event_device_util.h"
+
 +#ifndef SW_PEN_INSERTED
-+#define SW_PEN_INSERTED		0x0f  /* set = pen inserted */
++#define SW_PEN_INSERTED                0x0f  /* set = pen inserted */
 +#endif
 +
  namespace ui {
