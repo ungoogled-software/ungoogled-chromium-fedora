@@ -53,7 +53,6 @@ CHROMIUM_DISTRO_FLAGS=" --enable-plugins \
                         --disallow-signin \
                         --auto-ssl-client-auth @@EXTRA_FLAGS@@"
 
-
 # Load user flags
 if [ -n "$XDG_CONFIG_HOME" ]; then
     USER_FLAGS_LOCATION="$XDG_CONFIG_HOME/chromium-flags.conf"
@@ -62,8 +61,11 @@ elif [ -n "$HOME" ]; then
 fi
 if [ -f $USER_FLAGS_LOCATION ]; then
     while read -r line; do
-    [[ "$line" =~ ^#.*$ ]] && continue
-      CHROMIUM_DISTRO_FLAGS+="$line "
+    case "$line" in
+        --*)
+            CHROMIUM_DISTRO_FLAGS+="$line "
+        ;;
+    esac
     done < "$USER_FLAGS_LOCATION"
 fi
 
