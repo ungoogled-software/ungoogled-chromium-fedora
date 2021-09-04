@@ -35,8 +35,7 @@
 %global __python3 /usr/bin/python3
 %endif
 
-# This will probably be truely possible with Chromium 93
-# Right now, we fake it a bit and pull in both python2 and python3 stacks. sorry.
+# This is finally possible with Chromium 93
 %global build_with_python3 1
 
 %if 0%{?build_with_python3}
@@ -120,7 +119,7 @@ BuildRequires:  libicu-devel >= 5.4
 
 # Fedora's Python 2 stack is being removed, we use the bundled Python libraries
 # This can be revisited once we upgrade to Python 3
-%global bundlepylibs 1
+%global bundlepylibs 0
 
 # RHEL 7.9 dropped minizip.
 # It exists everywhere else though.
@@ -134,7 +133,7 @@ BuildRequires:  libicu-devel >= 5.4
 %global gtk3 1
 
 %if 0%{?rhel} == 7 || 0%{?rhel} == 8
-%global dts_version 10
+%global dts_version 9
 
 %global bundleopus 1
 %global bundlelibusbx 1
@@ -176,18 +175,18 @@ BuildRequires:  libicu-devel >= 5.4
 #Build with debugging symbols
 %global debug_pkg 0
 
-%global majorversion 92
+%global majorversion 93
 %global revision 1
 
 # Depot tools revision
-%global depot_tools_revision db5261ff1b9eaff1afd559e57e96330fb12ca0c3
+%global depot_tools_revision a806594b95a39141fdbf1f359087a44ffb2deaaf
 
 %if %{freeworld}
 Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4515.131
+Version:	%{majorversion}.0.4577.63
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -210,7 +209,7 @@ Patch4:		chromium-60.0.3112.78-jpeg-nomangle.patch
 # Do not mangle zlib
 Patch5:		chromium-77.0.3865.75-no-zlib-mangle.patch
 # Do not use unrar code, it is non-free
-Patch6:		chromium-92.0.4515.107-norar.patch
+Patch6:		chromium-93.0.4577.63-norar.patch
 # Use Gentoo's Widevine hack
 # https://gitweb.gentoo.org/repo/gentoo.git/tree/www-client/chromium/files/chromium-widevine-r3.patch
 Patch7:		chromium-71.0.3578.98-widevine-r3.patch
@@ -220,9 +219,9 @@ Patch8:		chromium-91.0.4472.77-disable-fontconfig-cache-magic.patch
 Patch9:		chromium-78.0.3904.70-gcc9-drop-rsp-clobber.patch
 # Try to load widevine from other places
 Patch10:	chromium-92.0.4515.107-widevine-other-locations.patch
-# Try to fix version.py for Rawhide
+# Tell bootstrap.py to always use the version of Python we specify
 %if 0%{?build_with_python3}
-Patch11:        chromium-92.0.4515.107-py3-bootstrap.patch
+Patch11:        chromium-93.0.4577.63-py3-bootstrap.patch
 %else
 Patch11:	chromium-92.0.4515.107-py2-bootstrap.patch
 %endif
@@ -238,7 +237,7 @@ Patch55:	chromium-78-protobuf-RepeatedPtrField-export.patch
 # ../../third_party/perfetto/include/perfetto/base/task_runner.h:48:55: error: 'uint32_t' has not been declared
 Patch56:	chromium-80.0.3987.87-missing-cstdint-header.patch
 # Missing <cstring> (thanks c++17)
-Patch57:	chromium-89.0.4389.72-missing-cstring-header.patch
+Patch57:	chromium-93.0.4577.63-missing-cstring.patch
 # prepare for using system ffmpeg (clean)
 # http://svnweb.mageia.org/packages/cauldron/chromium-browser-stable/current/SOURCES/chromium-53-ffmpeg-no-deprecation-errors.patch?view=markup
 Patch58:	chromium-53-ffmpeg-no-deprecation-errors.patch
@@ -268,19 +267,45 @@ Patch68:	chromium-84.0.4147.125-aarch64-clearkeycdm-binutils-workaround.patch
 Patch75:	chromium-90.0.4430.72-fstatfix.patch
 # Rawhide (f35) glibc defines SIGSTKSZ as a long instead of a constant
 Patch76:	chromium-92.0.4515.107-rawhide-gcc-std-max-fix.patch
-# Fix symbol visibility with gcc on swiftshader's libEGL
-Patch77:	chromium-88.0.4324.182-gcc-fix-swiftshader-libEGL-visibility.patch
 # Do not download proprietary widevine module in the background (thanks Debian)
-Patch79:	chromium-90.0.4430.72-widevine-no-download.patch
+Patch79:	chromium-93.0.4577.63-widevine-no-download.patch
 # Fix crashes with components/cast_*
 # Thanks to Gentoo
 Patch80:	chromium-92.0.4515.107-EnumTable-crash.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-92-v8-constexpr.patch
-Patch82:	chromium-92-v8-constexpr.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-93-BluetoothLowEnergyScanFilter-include.patch
+Patch81:	chromium-93-BluetoothLowEnergyScanFilter-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-93-ClassProperty-include.patch
+Patch82:	chromium-93-ClassProperty-include.patch
 # Fixes for python3
 Patch83:	chromium-92.0.4515.107-py3-fixes.patch
-# Fix build with Freetype 2.11
-Patch84:	chromium-freetype-2.11.patch
+# Support older freetype than 2.11 (for epel8)
+Patch84:	chromium-93.0.4577.63-freetype-2.11.patch
+# Clean up clang-format for python3
+# thanks to Jon Nettleton
+Patch86:	chromium-93.0.4577.63-clang-format.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-93-ContextSet-permissive.patch
+Patch87:	chromium-93-ContextSet-permissive.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-93-DevToolsEmbedderMessageDispatcher-include.patch
+Patch88:	chromium-93-DevToolsEmbedderMessageDispatcher-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-93-FormForest-constexpr.patch
+Patch89:	chromium-93-FormForest-constexpr.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-93-HashPasswordManager-include.patch
+Patch90:	chromium-93-HashPasswordManager-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-93-pdfium-include.patch
+Patch91:	chromium-93-pdfium-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-93-ScopedTestDialogAutoConfirm-include.patch
+Patch92:	chromium-93-ScopedTestDialogAutoConfirm-include.patch
+# In file included from ../../components/cast_channel/enum_table.cc:5:
+# ../../components/cast_channel/enum_table.h:359:18: error: 'vector' in namespace 'std' does not name a template type
+#   359 |       const std::vector<Entry> data_;
+#       |                  ^~~~~~
+# ../../components/cast_channel/enum_table.h:18:1: note: 'std::vector' is defined in header '<vector>'; did you forget to '#include <vector>'?
+Patch93:	chromium-93.0.4577.63-vector-fix.patch
+# Fix NoDestructor issue with gcc
+Patch94:	chromium-93.0.4577.63-remoting-nodestructor-fix.patch
+# include full UrlResponseHead header
+Patch95:	chromium-93.0.4577.63-mojo-header-fix.patch
+
 
 # Use lstdc++ on EPEL7 only
 Patch101:	chromium-75.0.3770.100-epel7-stdc++.patch
@@ -307,6 +332,8 @@ Patch109:	chromium-90.0.4430.93-epel7-erase-fix.patch
 # Again, not sure how epel8 is the only one to hit this...
 # AARCH64 neon symbols need to be prefixed too to prevent multiple definition issue at linktime
 Patch110:	chromium-90.0.4430.93-epel8-aarch64-libpng16-symbol-prefixes.patch
+# The implementation of linux/userfaultfd.h in EL-8 is too old to support what Chromium wants to do. Turn off the relevant chromium code.
+Patch111:	chromium-92.0.4515.159-epel8-uffd-off.patch
 
 
 # VAAPI
@@ -370,7 +397,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source21:       %{name}.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 92.0.4515.131-1
+%global ungoogled_chromium_revision 93.0.4577.63-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -446,6 +473,8 @@ BuildRequires:	libstdc++-devel, openssl-devel
 # Fedora tries to use system libs whenever it can.
 BuildRequires:	bzip2-devel
 BuildRequires:	dbus-glib-devel
+# For eu-strip
+BuildRequires:	elfutils
 BuildRequires:	elfutils-libelf-devel
 BuildRequires:	flac-devel
 %if 0%{?bundlefreetype}
@@ -512,25 +541,26 @@ BuildRequires:	pkgconfig(gtk+-3.0)
 %else
 BuildRequires:	pkgconfig(gtk+-2.0)
 %endif
-# BuildRequires:	%{chromium_pybin}
-# %%if ! %%{build_with_python3}
+BuildRequires:	%{chromium_pybin}
+%if ! %{build_with_python3}
 %if 0%{?fedora} >= 32
 BuildRequires:	python2.7
 %else
 BuildRequires:	python2
 BuildRequires:	python2-devel
 %endif
-# %%else
+%else
 BuildRequires:  python3
 BuildRequires:  python3-devel
-# %%endif
+%endif
 
-# %%if 0%{?build_with_python3}
+%if 0%{?build_with_python3}
 %if 0%{?bundlepylibs}
 # Using bundled bits, do nothing.
 %else
 %if 0%{?fedora}
 BuildRequires:	python3-beautifulsoup4
+# BuildRequires:	python2-beautifulsoup
 BuildRequires:	python3-html5lib
 BuildRequires:	python3-markupsafe
 BuildRequires:	python3-ply
@@ -543,7 +573,7 @@ BuildRequires:	python-ply
 %endif
 BuildRequires:	python3-simplejson
 %endif
-#%%else
+%else
 %if 0%{?bundlepylibs}
 # Using bundled bits, do nothing.
 %else
@@ -562,7 +592,7 @@ BuildRequires:  python-ply
 %endif
 BuildRequires:  python2-simplejson
 %endif
-# %%endif
+%endif
 
 
 %if 0%{?bundlere2}
@@ -761,12 +791,22 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %if 0%{?fedora} >= 35
 %patch76 -p1 -b .sigstkszfix
 %endif
-%patch77 -p1 -b .gcc-swiftshader-visibility
 %patch79 -p1 -b .widevine-no-download
 %patch80 -p1 -b .EnumTable-crash
-%patch82 -p1 -b .v8-constexpr
+%patch81 -p1 -b .BluetoothLowEnergyScanFilter-include
+%patch82 -p1 -b .ClassProperty-include
 %patch83 -p1 -b .py3fixes
 %patch84 -p1 -b .freetype-2.11
+%patch86 -p1 -b .clang-format-py3
+%patch87 -p1 -b .ContextSet-permissive
+%patch88 -p1 -b .DevToolsEmbedderMessageDispatcher-include
+%patch89 -p1 -b .FormForest-constexpr
+%patch90 -p1 -b .HashPasswordManager-include
+%patch91 -p1 -b .pdfium-include
+%patch92 -p1 -b .ScopedTestDialogAutoConfirm-include
+%patch93 -p1 -b .vector-fix
+%patch94 -p1 -b .remoting-nodestructor-fix
+%patch95 -p1 -b .mojo-header-fix
 
 
 # EPEL specific patches
@@ -782,6 +822,7 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %if 0%{?rhel} == 8
 # %%patch107 -p1 -b .el8-arm-incompatible-ints
 %patch110 -p1 -b .el8-aarch64-libpng16-symbol-prefixes
+%patch111 -p1 -b .el8-uffd-off
 %endif
 
 # Feature specific patches
@@ -797,9 +838,9 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch300 -p1 -b .disblegnomekeyring
 
 %patch400 -p1 -b .gcc11
-%if 0%{?rhel} >= 7
-%patch401 -p1 -b .partition-malloc
-%endif
+#%if 0%{?rhel} >= 7
+#%patch401 -p1 -b .partition-malloc
+#%endif
 
 # RPM Fusion patches [free/chromium-freeworld]:
 %patch503 -p1 -b .manpage
@@ -934,9 +975,9 @@ UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_vaapi=false'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' rtc_use_pipewire=true rtc_link_pipewire=true'
 %endif
 # CentOS kernel header doesn't have uffdio_writeprotect, needs more info
-%if 0%{?rhel} >= 7
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_partition_alloc=false'
-%endif
+#%if 0%{?rhel} >= 7
+#UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_partition_alloc=false'
+#%endif
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' chrome_pgo_phase=0 enable_js_type_check=false enable_mse_mpeg2ts_stream_parser=true enable_nacl_nonsfi=false enable_one_click_signin=false enable_reading_list=false enable_remoting=false enable_reporting=false enable_service_discovery=false safe_browsing_mode=0'
 export UNGOOGLED_CHROMIUM_GN_DEFINES
 
@@ -982,7 +1023,6 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/angle/src/common/third_party/base' \
 	'third_party/angle/src/common/third_party/smhasher' \
 	'third_party/angle/src/common/third_party/xxhash' \
-	'third_party/angle/src/third_party/compiler' \
 	'third_party/angle/src/third_party/libXNVCtrl' \
 	'third_party/angle/src/third_party/trace_event' \
 	'third_party/angle/src/third_party/volk' \
@@ -1021,6 +1061,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/dav1d' \
 	'third_party/dawn' \
 	'third_party/dawn/third_party/khronos' \
+    'third_party/dawn/third_party/tint' \
 	'third_party/depot_tools' \
 	'third_party/devscripts' \
 	'third_party/devtools-frontend' \
@@ -1106,15 +1147,14 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/lss' \
 	'third_party/lzma_sdk' \
 	'third_party/mako' \
-%if 0%{?bundlepylibs}
 	'third_party/markupsafe' \
-%endif
 	'third_party/mesa' \
 	'third_party/metrics_proto' \
 	'third_party/minigbm' \
 	'third_party/modp_b64' \
 	'third_party/nasm' \
 	'third_party/nearby' \
+    'third_party/neon_2_sse' \
 	'third_party/node' \
 	'third_party/node/node_modules/polymer-bundler/lib/third_party/UglifyJS2' \
 	'third_party/one_euro_filter' \
@@ -1209,7 +1249,6 @@ build/linux/unbundle/remove_bundled_libraries.py \
     'third_party/zlib' \
 	'third_party/zlib/google' \
 	'tools/gn/src/base/third_party/icu' \
-	'tools/grit/third_party/six' \
 	'url/third_party/mozilla' \
 	'v8/src/third_party/siphash' \
 	'v8/src/third_party/utf8-decoder' \
@@ -1217,17 +1256,6 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'v8/third_party/v8' \
 	'v8/third_party/inspector_protocol' \
 	--do-remove
-
-%if ! 0%{?bundlepylibs}
-# Look, I don't know. This package is spit and chewing gum. Sorry.
-rm -rf third_party/markupsafe
-%if 0%{?build_with_python3}
-ln -s %{python3_sitearch}/markupsafe third_party/markupsafe
-%else
-ln -s %{python2_sitearch}/markupsafe third_party/markupsafe
-%endif
-# We should look on removing other python packages as well i.e. ply
-%endif
 
 export PATH=$PATH:%{_builddir}/depot_tools
 
@@ -1300,6 +1328,11 @@ sed -i '/aarch64)/ a \        exec "/usr/bin/ninja-build" "$@";;\' ../depot_tool
 %endif
 sed -i 's|exec "${THIS_DIR}/ninja-linux${LONG_BIT}"|exec "/usr/bin/ninja-build"|g' ../depot_tools/ninja
 
+# Get rid of the pre-built eu-strip binary, it is x86_64 and of mysterious origin
+rm -rf buildtools/third_party/eu-strip/bin/eu-strip
+# Replace it with a symlink to the Fedora copy
+ln -s %{_bindir}/eu-strip buildtools/third_party/eu-strip/bin/eu-strip
+
 %if 0%{?rhel} == 7
 . /opt/rh/devtoolset-%{dts_version}/enable
 %endif
@@ -1363,7 +1396,7 @@ tar xf %{SOURCE20}
 %endif
 
 # export PYTHONPATH="../../third_party/pyjson5/src:../../third_party/catapult/third_party/google-endpoints:../../xcb-proto-1.14"
-export PYTHONPATH="../../third_party/pyjson5/src:../../xcb-proto-1.14"
+export PYTHONPATH="../../third_party/pyjson5/src:../../xcb-proto-1.14:../../third_party/catapult/third_party/html5lib-1.1"
 
 echo
 # Now do the full browser
@@ -1421,6 +1454,7 @@ rm -rf %{buildroot}
 		%endif
 		cp -a chrome %{buildroot}%{chromium_path}/%{chromium_browser_channel}
 		cp -a chrome_sandbox %{buildroot}%{chromium_path}/chrome-sandbox
+		cp -a crashpad_handler %{buildroot}%{chromium_path}/crashpad_handler
 		cp -a ../../chrome/app/resources/manpage.1.in %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
 		sed -i "s|@@PACKAGE@@|%{chromium_browser_channel}|g" %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
 		sed -i "s|@@MENUNAME@@|%{chromium_menu_name}|g" %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
@@ -1511,6 +1545,7 @@ fi
 %dir %{chromium_path}
 %{chromium_path}/*.bin
 %{chromium_path}/chrome_*.pak
+%{chromium_path}/crashpad_handler
 %{chromium_path}/resources.pak
 %{chromium_path}/icudtl.dat
 %{chromium_path}/%{chromium_browser_channel}
@@ -1602,6 +1637,9 @@ fi
 %endif
 
 %changelog
+* Mon Sep  4 2021 wchen342 <feiyu2817@gmail.com> - 93.0.4577.63-1
+- update Chromium to 93.0.4577.63
+
 * Mon Aug  9 2021 wchen342 <feiyu2817@gmail.com> - 92.0.4515.131-1
 - update Chromium to 92.0.4515.131
 

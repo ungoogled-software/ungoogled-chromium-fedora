@@ -236,6 +236,7 @@ manual_files="	libavcodec/aarch64/fft_neon.S \
 		libavcodec/hpeldsp.c \
 		libavcodec/mdct15.c \
 		libavcodec/mdct_template.c \
+		libavcodec/options.c \
 		libavcodec/pel_template.c \
 		libavcodec/utils.c \
 		libavcodec/videodsp.c \
@@ -255,7 +256,9 @@ manual_files="	libavcodec/aarch64/fft_neon.S \
 		libavutil/fixed_dsp.c \
 		libavutil/float_dsp.c \
 		libavutil/imgutils.c \
+		libavutil/tx_float.c \
 		libavutil/tx_template.c \
+		libavutil/utils.c \
 		libavutil/x86/cpu.c \
 		libavutil/x86/float_dsp_init.c \
 		libavutil/x86/x86inc.asm \
@@ -276,7 +279,6 @@ mp3_files="	libavcodec/aarch64/aacpsdsp_init_aarch64.c \
 		libavcodec/aacsbr.c \
 		libavcodec/aactab.c \
 		libavcodec/ac3tab.c \
-		libavcodec/autorename_libavcodec_aacdec.c \
 		libavcodec/autorename_libavcodec_mpegaudiodsp.c \
 		libavcodec/autorename_libavcodec_sbrdsp.c \
 		libavcodec/cbrt_data.c \

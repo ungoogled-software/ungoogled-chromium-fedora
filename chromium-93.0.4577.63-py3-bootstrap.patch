@@ -1,0 +1,12 @@
+diff -up chromium-93.0.4577.63/tools/gn/bootstrap/bootstrap.py.py3 chromium-93.0.4577.63/tools/gn/bootstrap/bootstrap.py
+--- chromium-93.0.4577.63/tools/gn/bootstrap/bootstrap.py.py3	2021-08-31 21:40:34.000000000 -0400
++++ chromium-93.0.4577.63/tools/gn/bootstrap/bootstrap.py	2021-09-02 08:26:04.415846917 -0400
+@@ -130,7 +130,7 @@ def main(argv):
+     if not options.debug:
+       gn_gen_args += ' is_debug=false'
+     subprocess.check_call([
+-        gn_path, 'gen', out_dir,
++        gn_path, 'gen', out_dir, ' --script-executable=/usr/bin/python3',
+         '--args=%s' % gn_gen_args, "--root=" + SRC_ROOT
+     ])
+ 

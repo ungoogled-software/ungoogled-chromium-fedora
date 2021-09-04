@@ -1,0 +1,12 @@
+diff -up chromium-92.0.4515.159/base/allocator/partition_allocator/partition_alloc_config.h.epel8-uffd-off chromium-92.0.4515.159/base/allocator/partition_allocator/partition_alloc_config.h
+--- chromium-92.0.4515.159/base/allocator/partition_allocator/partition_alloc_config.h.epel8-uffd-off	2021-08-30 09:25:56.878243728 -0400
++++ chromium-92.0.4515.159/base/allocator/partition_allocator/partition_alloc_config.h	2021-08-30 09:26:12.489322762 -0400
+@@ -37,7 +37,7 @@ static_assert(sizeof(void*) != 8, "");
+ #if defined(PA_HAS_64_BITS_POINTERS) && \
+     (defined(OS_LINUX) || defined(OS_ANDROID))
+ // TODO(bikineev): Enable for ChromeOS.
+-#define PA_STARSCAN_UFFD_WRITE_PROTECTOR_SUPPORTED
++// #define PA_STARSCAN_UFFD_WRITE_PROTECTOR_SUPPORTED
+ #endif
+ 
+ // POSIX is not only UNIX, e.g. macOS and other OSes. We do use Linux-specific

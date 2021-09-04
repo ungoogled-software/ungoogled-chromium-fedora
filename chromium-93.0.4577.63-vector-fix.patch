@@ -1,0 +1,11 @@
+diff -up chromium-93.0.4577.63/components/cast_channel/enum_table.h.vector-fix chromium-93.0.4577.63/components/cast_channel/enum_table.h
+--- chromium-93.0.4577.63/components/cast_channel/enum_table.h.vector-fix	2021-09-03 12:23:37.974714814 +0000
++++ chromium-93.0.4577.63/components/cast_channel/enum_table.h	2021-09-03 12:23:51.330223540 +0000
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <cstring>
+ #include <ostream>
++#include <vector>
+ 
+ #include "base/check_op.h"
+ #include "base/macros.h"
