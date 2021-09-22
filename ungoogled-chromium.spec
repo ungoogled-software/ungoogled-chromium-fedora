@@ -186,7 +186,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4577.63
+Version:	%{majorversion}.0.4577.82
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -278,8 +278,6 @@ Patch81:	chromium-93-BluetoothLowEnergyScanFilter-include.patch
 Patch82:	chromium-93-ClassProperty-include.patch
 # Fixes for python3
 Patch83:	chromium-92.0.4515.107-py3-fixes.patch
-# Support older freetype than 2.11 (for epel8)
-Patch84:	chromium-93.0.4577.63-freetype-2.11.patch
 # Clean up clang-format for python3
 # thanks to Jon Nettleton
 Patch86:	chromium-93.0.4577.63-clang-format.patch
@@ -305,6 +303,9 @@ Patch93:	chromium-93.0.4577.63-vector-fix.patch
 Patch94:	chromium-93.0.4577.63-remoting-nodestructor-fix.patch
 # include full UrlResponseHead header
 Patch95:	chromium-93.0.4577.63-mojo-header-fix.patch
+# Fix against HarfBuzz v3
+# Thanks to Jan Beich @ FreeBSD
+Patch96:	chromium-93.0.4577.82-harfbuzz3.patch
 
 
 # Use lstdc++ on EPEL7 only
@@ -332,8 +333,6 @@ Patch109:	chromium-90.0.4430.93-epel7-erase-fix.patch
 # Again, not sure how epel8 is the only one to hit this...
 # AARCH64 neon symbols need to be prefixed too to prevent multiple definition issue at linktime
 Patch110:	chromium-90.0.4430.93-epel8-aarch64-libpng16-symbol-prefixes.patch
-# The implementation of linux/userfaultfd.h in EL-8 is too old to support what Chromium wants to do. Turn off the relevant chromium code.
-Patch111:	chromium-92.0.4515.159-epel8-uffd-off.patch
 
 
 # VAAPI
@@ -347,8 +346,6 @@ Patch300:	chromium-92.0.4515.107-rhel8-force-disable-use_gnome_keyring.patch
 
 # And fixes for new compilers
 Patch400:       chromium-gcc11.patch
-# Fix Blink ignoring use_allocator flag
-Patch401:       chromium-92.0.4515.131-centos-no-partition-malloc.patch
 
 # RPM Fusion patches [free/chromium-freeworld]:
 Patch503:       chromium-manpage.patch
@@ -386,18 +383,19 @@ Source15:	https://download.savannah.nongnu.org/releases/freebangfont/MuktiNarrow
 Source16:	https://github.com/web-platform-tests/wpt/raw/master/fonts/Ahem.ttf
 Source17:	GardinerModBug.ttf
 Source18:	GardinerModCat.ttf
-# RHEL 7 needs newer nodejs
-%if 0%{?rhel} == 7
-Source19:	https://nodejs.org/dist/v10.15.3/node-v10.15.3-linux-x64.tar.gz
+# RHEL 7|8 needs newer nodejs
+%if 0%{?rhel} && 0%{?rhel} <= 8
+Source19:	https://nodejs.org/dist/latest-v12.x/node-v12.22.6-linux-x64.tar.xz
+Source21:	https://nodejs.org/dist/latest-v12.x/node-v12.22.6-linux-arm64.tar.xz
 %endif
 # Bring xcb-proto with us (might need more than python on EPEL?)
 Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 
 # Add our own appdata file.
-Source21:       %{name}.appdata.xml
+Source22:       %{name}.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 93.0.4577.63-1
+%global ungoogled_chromium_revision 93.0.4577.82-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -449,8 +447,8 @@ BuildRequires:	minizip-compat-devel
 # BuildRequires:	minizip-devel
 %endif
 %endif
-# RHEL 7's nodejs is too old
-%if 0%{?rhel} == 7
+# RHEL 7|8's nodejs is too old
+%if 0%{?rhel} && 0%{?rhel} <= 8
 # Use bundled.
 %else
 BuildRequires:	nodejs
@@ -541,7 +539,9 @@ BuildRequires:	pkgconfig(gtk+-3.0)
 %else
 BuildRequires:	pkgconfig(gtk+-2.0)
 %endif
-BuildRequires:	%{chromium_pybin}
+%if 0%{?fedora}
+#BuildRequires:	%{chromium_pybin}
+%endif
 %if ! %{build_with_python3}
 %if 0%{?fedora} >= 32
 BuildRequires:	python2.7
@@ -558,20 +558,21 @@ BuildRequires:  python3-devel
 %if 0%{?bundlepylibs}
 # Using bundled bits, do nothing.
 %else
-%if 0%{?fedora}
+%if 0%{?fedora} || 0%{?rhel} >= 8
 BuildRequires:	python3-beautifulsoup4
 # BuildRequires:	python2-beautifulsoup
 BuildRequires:	python3-html5lib
 BuildRequires:	python3-markupsafe
 BuildRequires:	python3-ply
+BuildRequires:	python3-simplejson
 %else
 BuildRequires:	python-beautifulsoup4
 BuildRequires:	python-BeautifulSoup
 BuildRequires:	python-html5lib
 BuildRequires:	python-markupsafe
 BuildRequires:	python-ply
+BuildRequires:	python-simplejson
 %endif
-BuildRequires:	python3-simplejson
 %endif
 %else
 %if 0%{?bundlepylibs}
@@ -796,7 +797,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch81 -p1 -b .BluetoothLowEnergyScanFilter-include
 %patch82 -p1 -b .ClassProperty-include
 %patch83 -p1 -b .py3fixes
-%patch84 -p1 -b .freetype-2.11
 %patch86 -p1 -b .clang-format-py3
 %patch87 -p1 -b .ContextSet-permissive
 %patch88 -p1 -b .DevToolsEmbedderMessageDispatcher-include
@@ -807,6 +807,9 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch93 -p1 -b .vector-fix
 %patch94 -p1 -b .remoting-nodestructor-fix
 %patch95 -p1 -b .mojo-header-fix
+%if 0%{?fedora} >= 36
+%patch96 -p1 -b .hbfix
+%endif
 
 
 # EPEL specific patches
@@ -822,7 +825,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %if 0%{?rhel} == 8
 # %%patch107 -p1 -b .el8-arm-incompatible-ints
 %patch110 -p1 -b .el8-aarch64-libpng16-symbol-prefixes
-%patch111 -p1 -b .el8-uffd-off
 %endif
 
 # Feature specific patches
@@ -838,9 +840,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch300 -p1 -b .disblegnomekeyring
 
 %patch400 -p1 -b .gcc11
-#%if 0%{?rhel} >= 7
-#%patch401 -p1 -b .partition-malloc
-#%endif
 
 # RPM Fusion patches [free/chromium-freeworld]:
 %patch503 -p1 -b .manpage
@@ -974,20 +973,24 @@ UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_vaapi=false'
 %if 0%{?fedora}
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' rtc_use_pipewire=true rtc_link_pipewire=true'
 %endif
-# CentOS kernel header doesn't have uffdio_writeprotect, needs more info
-#%if 0%{?rhel} >= 7
-#UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_partition_alloc=false'
-#%endif
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' chrome_pgo_phase=0 enable_js_type_check=false enable_mse_mpeg2ts_stream_parser=true enable_nacl_nonsfi=false enable_one_click_signin=false enable_reading_list=false enable_remoting=false enable_reporting=false enable_service_discovery=false safe_browsing_mode=0'
 export UNGOOGLED_CHROMIUM_GN_DEFINES
 
 # ungoogled-chromium: binary pruning.
 python3 -B %{ungoogled_chromium_root}/utils/prune_binaries.py . %{ungoogled_chromium_root}/pruning.list || true
 
-%if 0%{?rhel} == 7
+%if 0%{?rhel} && 0%{?rhel} <= 8
 pushd third_party/node/linux
+%ifarch x86_64
 tar xf %{SOURCE19}
-mv node-v10.15.3-linux-x64 node-linux-x64
+mv node-v12.22.6-linux-x64 node-linux-x64
+%endif
+%ifarch aarch64
+tar xf %{SOURCE21}
+mv node-v12.22.6-linux-arm64 node-linux-arm64
+# This is weird, but whatever
+ln -s node-linux-arm64 node-linux-x64
+%endif
 popd
 %else
 mkdir -p third_party/node/linux/node-linux-x64/bin
@@ -1512,7 +1515,7 @@ rm -rf %{buildroot}
 	mkdir -p %{buildroot}%{_datadir}/applications/
 	desktop-file-install --dir %{buildroot}%{_datadir}/applications %{SOURCE4}
 
-	install -D -m0644 %{SOURCE21} ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{chromium_browser_channel}.appdata.xml
+	install -D -m0644 %{SOURCE22} ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{chromium_browser_channel}.appdata.xml
 	appstream-util validate-relax --nonet ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{chromium_browser_channel}.appdata.xml
 
 	mkdir -p %{buildroot}%{_datadir}/gnome-control-center/default-apps/
@@ -1637,6 +1640,9 @@ fi
 %endif
 
 %changelog
+* Wed Sep 22 2021 wchen342 <feiyu2817@gmail.com> - 93.0.4577.82-1
+- update Chromium to 93.0.4577.82
+
 * Mon Sep  4 2021 wchen342 <feiyu2817@gmail.com> - 93.0.4577.63-1
 - update Chromium to 93.0.4577.63
 
