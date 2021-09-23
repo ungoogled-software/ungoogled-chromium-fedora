@@ -952,7 +952,7 @@ UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_custom_libcxx=false'
 %ifarch aarch64
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' target_cpu="arm64"'
 %endif
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gnome_keyring=false use_glib=true'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gnome_keyring=false use_glib=false'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gio=true use_pulseaudio=true icu_use_data_file=true'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' enable_nacl=false'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_component_ffmpeg=false is_component_build=false'
