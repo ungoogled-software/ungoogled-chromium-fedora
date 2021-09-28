@@ -79,6 +79,7 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavcodec/codec_par.h \
 		libavcodec/dct.h \
 		libavcodec/dct32.h \
+		libavcodec/defs.h \
 		libavcodec/error_resilience.h \
 		libavcodec/fdctdsp.h \
 		libavcodec/fft.h \

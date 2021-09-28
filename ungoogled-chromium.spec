@@ -145,23 +145,21 @@ BuildRequires:  libicu-devel >= 5.4
 %global bundlelibdrm 1
 %global bundlefontconfig 1
 %else
+# As of Chromium 94, it uses functions in harfbuzz 2.9.0+, which is only found in F36+.
+%if 0%{?fedora} >= 36
 %global bundleharfbuzz 0
+%else
+%global bundleharfbuzz 1
+%endif
 %global bundleopus 1
 %global bundlelibusbx 0
 %global bundlelibwebp 0
 %global bundlelibpng 0
 %global bundlelibjpeg 0
-%global bundlefreetype 0
+# Needs FT_ClipBox which was implemented after 2.11.0. Should be able to set this back to 0 later.
+%global bundlefreetype 1
 %global bundlelibdrm 0
 %global bundlefontconfig 0
-%endif
-
-# Needs at least harfbuzz 2.4.0 now.
-# 2019-09-13
-%if 0%{?fedora} < 31
-%global bundleharfbuzz 1
-%else
-%global bundleharfbuzz 0
 %endif
 
 ### Google API keys (see http://www.chromium.org/developers/how-tos/api-keys)
@@ -175,18 +173,18 @@ BuildRequires:  libicu-devel >= 5.4
 #Build with debugging symbols
 %global debug_pkg 0
 
-%global majorversion 93
+%global majorversion 94
 %global revision 1
 
 # Depot tools revision
-%global depot_tools_revision a806594b95a39141fdbf1f359087a44ffb2deaaf
+%global depot_tools_revision 699d70d878603ebb3861c8f4487c4b05f5d81643
 
 %if %{freeworld}
 Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4577.82
+Version:	%{majorversion}.0.4606.61
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -216,7 +214,7 @@ Patch7:		chromium-71.0.3578.98-widevine-r3.patch
 # Disable fontconfig cache magic that breaks remoting
 Patch8:		chromium-91.0.4472.77-disable-fontconfig-cache-magic.patch
 # drop rsp clobber, which breaks gcc9 (thanks to Jeff Law)
-Patch9:		chromium-78.0.3904.70-gcc9-drop-rsp-clobber.patch
+Patch9:		chromium-94.0.4606.54-gcc9-drop-rsp-clobber.patch
 # Try to load widevine from other places
 Patch10:	chromium-92.0.4515.107-widevine-other-locations.patch
 # Tell bootstrap.py to always use the version of Python we specify
@@ -243,9 +241,6 @@ Patch57:	chromium-93.0.4577.63-missing-cstring.patch
 Patch58:	chromium-53-ffmpeg-no-deprecation-errors.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-91-libyuv-aarch64.patch
 Patch60:	chromium-91-libyuv-aarch64.patch
-# Update third_party/highway to 0.12.2
-# this is needed for sane arm/aarch64
-Patch61:	chromium-92.0.4515.107-update-highway-0.12.2.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-90-ruy-include.patch
 Patch62:	chromium-90-ruy-include.patch
 # Extra CXXFLAGS for aarch64
@@ -262,9 +257,6 @@ Patch66:	chromium-84.0.4147.125-remoting-cstring.patch
 Patch67:	chromium-84.0.4147.125-i686-fix_textrels.patch
 # Work around binutils bug in aarch64 (F33+)
 Patch68:	chromium-84.0.4147.125-aarch64-clearkeycdm-binutils-workaround.patch
-# Fix sandbox code to properly handle the new way that glibc handles fstat in Fedora 34+
-# Thanks to Kevin Kofler for the fix.
-Patch75:	chromium-90.0.4430.72-fstatfix.patch
 # Rawhide (f35) glibc defines SIGSTKSZ as a long instead of a constant
 Patch76:	chromium-92.0.4515.107-rawhide-gcc-std-max-fix.patch
 # Do not download proprietary widevine module in the background (thanks Debian)
@@ -272,27 +264,16 @@ Patch79:	chromium-93.0.4577.63-widevine-no-download.patch
 # Fix crashes with components/cast_*
 # Thanks to Gentoo
 Patch80:	chromium-92.0.4515.107-EnumTable-crash.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-93-BluetoothLowEnergyScanFilter-include.patch
-Patch81:	chromium-93-BluetoothLowEnergyScanFilter-include.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-93-ClassProperty-include.patch
-Patch82:	chromium-93-ClassProperty-include.patch
+
+# https://github.com/stha09/chromium-patches/blob/master/chromium-94-ConversionStorageSql-lambda.patch
+Patch81:	chromium-94-ConversionStorageSql-lambda.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-94-CustomSpaces-include.patch
+Patch82:	chromium-94-CustomSpaces-include.patch
 # Fixes for python3
 Patch83:	chromium-92.0.4515.107-py3-fixes.patch
 # Clean up clang-format for python3
 # thanks to Jon Nettleton
 Patch86:	chromium-93.0.4577.63-clang-format.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-93-ContextSet-permissive.patch
-Patch87:	chromium-93-ContextSet-permissive.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-93-DevToolsEmbedderMessageDispatcher-include.patch
-Patch88:	chromium-93-DevToolsEmbedderMessageDispatcher-include.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-93-FormForest-constexpr.patch
-Patch89:	chromium-93-FormForest-constexpr.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-93-HashPasswordManager-include.patch
-Patch90:	chromium-93-HashPasswordManager-include.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-93-pdfium-include.patch
-Patch91:	chromium-93-pdfium-include.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-93-ScopedTestDialogAutoConfirm-include.patch
-Patch92:	chromium-93-ScopedTestDialogAutoConfirm-include.patch
 # In file included from ../../components/cast_channel/enum_table.cc:5:
 # ../../components/cast_channel/enum_table.h:359:18: error: 'vector' in namespace 'std' does not name a template type
 #   359 |       const std::vector<Entry> data_;
@@ -300,12 +281,13 @@ Patch92:	chromium-93-ScopedTestDialogAutoConfirm-include.patch
 # ../../components/cast_channel/enum_table.h:18:1: note: 'std::vector' is defined in header '<vector>'; did you forget to '#include <vector>'?
 Patch93:	chromium-93.0.4577.63-vector-fix.patch
 # Fix NoDestructor issue with gcc
-Patch94:	chromium-93.0.4577.63-remoting-nodestructor-fix.patch
+Patch94:	chromium-94.0.4606.54-remoting-nodestructor-fix.patch
 # include full UrlResponseHead header
 Patch95:	chromium-93.0.4577.63-mojo-header-fix.patch
-# Fix against HarfBuzz v3
-# Thanks to Jan Beich @ FreeBSD
-Patch96:	chromium-93.0.4577.82-harfbuzz3.patch
+# Fix multiple defines issue in webrtc/BUILD.gn
+Patch96:	chromium-94.0.4606.54-webrtc-BUILD.gn-fix-multiple-defines.patch
+# Fix extra qualification error
+Patch97:	chromium-94.0.4606.61-remoting-extra-qualification.patch
 
 
 # Use lstdc++ on EPEL7 only
@@ -395,7 +377,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source22:       %{name}.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 93.0.4577.82-1
+%global ungoogled_chromium_revision 94.0.4606.61-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -538,9 +520,6 @@ BuildRequires:	perl(Switch)
 BuildRequires:	pkgconfig(gtk+-3.0)
 %else
 BuildRequires:	pkgconfig(gtk+-2.0)
-%endif
-%if 0%{?fedora}
-#BuildRequires:	%{chromium_pybin}
 %endif
 %if ! %{build_with_python3}
 %if 0%{?fedora} >= 32
@@ -780,7 +759,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch57 -p1 -b .missing-cstring
 %patch58 -p1 -b .ffmpeg-deprecations
 %patch60 -p1 -b .libyuv-aarch64
-%patch61 -p1 -b .update-highway-0.12.2
 %patch62 -p1 -b .ruy-include
 %patch63 -p1 -b .aarch64-cxxflags-addition
 %patch64 -p1 -b .java-only-allowed
@@ -788,28 +766,20 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch66 -p1 -b .remoting-cstring
 %patch67 -p1 -b .i686-textrels
 %patch68 -p1 -b .aarch64-clearkeycdm-binutils-workaround
-%patch75 -p1 -b .fstatfix
 %if 0%{?fedora} >= 35
 %patch76 -p1 -b .sigstkszfix
 %endif
 %patch79 -p1 -b .widevine-no-download
 %patch80 -p1 -b .EnumTable-crash
-%patch81 -p1 -b .BluetoothLowEnergyScanFilter-include
-%patch82 -p1 -b .ClassProperty-include
+%patch81 -p1 -b .ConversionStorageSql-lambda-include
+%patch82 -p1 -b .CustomSpaces-include
 %patch83 -p1 -b .py3fixes
 %patch86 -p1 -b .clang-format-py3
-%patch87 -p1 -b .ContextSet-permissive
-%patch88 -p1 -b .DevToolsEmbedderMessageDispatcher-include
-%patch89 -p1 -b .FormForest-constexpr
-%patch90 -p1 -b .HashPasswordManager-include
-%patch91 -p1 -b .pdfium-include
-%patch92 -p1 -b .ScopedTestDialogAutoConfirm-include
 %patch93 -p1 -b .vector-fix
 %patch94 -p1 -b .remoting-nodestructor-fix
 %patch95 -p1 -b .mojo-header-fix
-%if 0%{?fedora} >= 36
-%patch96 -p1 -b .hbfix
-%endif
+%patch96 -p1 -b .webrtc-BUILD.gn-fix-multiple-defines
+%patch97 -p1 -b .remoting-extra-qualification
 
 
 # EPEL specific patches
@@ -939,7 +909,7 @@ UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_debug=false is_official_build=false is_unsaf
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' system_libdir="lib64"'
 %endif
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' google_api_key="%{api_key}" google_default_client_id="%{default_client_id}" google_default_client_secret="%{default_client_secret}"'
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_clang=false use_sysroot=false fieldtrial_testing_like_official_build=true use_lld=false rtc_enable_symbol_export=true'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_clang=false use_sysroot=false disable_fieldtrial_testing_config=true use_lld=false rtc_enable_symbol_export=true'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' use_gold=false'
 
 %if %{freeworld}
@@ -1082,6 +1052,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/devtools-frontend/src/front_end/third_party/marked' \
 	'third_party/devtools-frontend/src/front_end/third_party/puppeteer' \
 	'third_party/devtools-frontend/src/front_end/third_party/wasmparser' \
+	'third_party/devtools-frontend/src/test/unittests/front_end/third_party/i18n' \
 	'third_party/dom_distiller_js' \
 	'third_party/eigen3' \
 	'third_party/emoji-segmenter' \
@@ -1399,7 +1370,11 @@ tar xf %{SOURCE20}
 %endif
 
 # export PYTHONPATH="../../third_party/pyjson5/src:../../third_party/catapult/third_party/google-endpoints:../../xcb-proto-1.14"
+%if 0%{?rhel} == 8
+export PYTHONPATH="../../third_party/protobuf/third_party/six:../../third_party/pyjson5/src:../../xcb-proto-1.14:../../third_party/catapult/third_party/html5lib-1.1"
+%else
 export PYTHONPATH="../../third_party/pyjson5/src:../../xcb-proto-1.14:../../third_party/catapult/third_party/html5lib-1.1"
+%endif
 
 echo
 # Now do the full browser
@@ -1457,7 +1432,7 @@ rm -rf %{buildroot}
 		%endif
 		cp -a chrome %{buildroot}%{chromium_path}/%{chromium_browser_channel}
 		cp -a chrome_sandbox %{buildroot}%{chromium_path}/chrome-sandbox
-		cp -a crashpad_handler %{buildroot}%{chromium_path}/crashpad_handler
+		cp -a chrome_crashpad_handler %{buildroot}%{chromium_path}/chrome_crashpad_handler
 		cp -a ../../chrome/app/resources/manpage.1.in %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
 		sed -i "s|@@PACKAGE@@|%{chromium_browser_channel}|g" %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
 		sed -i "s|@@MENUNAME@@|%{chromium_menu_name}|g" %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
@@ -1548,7 +1523,7 @@ fi
 %dir %{chromium_path}
 %{chromium_path}/*.bin
 %{chromium_path}/chrome_*.pak
-%{chromium_path}/crashpad_handler
+%{chromium_path}/chrome_crashpad_handler
 %{chromium_path}/resources.pak
 %{chromium_path}/icudtl.dat
 %{chromium_path}/%{chromium_browser_channel}
@@ -1640,6 +1615,9 @@ fi
 %endif
 
 %changelog
+* Wed Sep 28 2021 wchen342 <feiyu2817@gmail.com> - 94.0.4606.61-1
+- update Chromium to 94.0.4606.61
+
 * Wed Sep 22 2021 wchen342 <feiyu2817@gmail.com> - 93.0.4577.82-1
 - update Chromium to 93.0.4577.82
 

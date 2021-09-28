@@ -1,0 +1,16 @@
+diff -up chromium-94.0.4606.54/third_party/webrtc/BUILD.gn.fix-multiple-define chromium-94.0.4606.54/third_party/webrtc/BUILD.gn
+--- chromium-94.0.4606.54/third_party/webrtc/BUILD.gn.fix-multiple-define	2021-09-24 13:22:48.067565858 -0400
++++ chromium-94.0.4606.54/third_party/webrtc/BUILD.gn	2021-09-24 13:23:10.163664830 -0400
+@@ -119,10 +119,10 @@ config("common_inherited_config") {
+   ldflags = []
+ 
+   if (rtc_enable_symbol_export || is_component_build) {
+-    defines = [ "WEBRTC_ENABLE_SYMBOL_EXPORT" ]
++    defines += [ "WEBRTC_ENABLE_SYMBOL_EXPORT" ]
+   }
+   if (rtc_enable_objc_symbol_export) {
+-    defines = [ "WEBRTC_ENABLE_OBJC_SYMBOL_EXPORT" ]
++    defines += [ "WEBRTC_ENABLE_OBJC_SYMBOL_EXPORT" ]
+   }
+ 
+   if (build_with_mozilla) {

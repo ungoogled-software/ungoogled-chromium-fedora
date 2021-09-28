@@ -1,0 +1,12 @@
+diff -up chromium-94.0.4606.54/third_party/tcmalloc/vendor/src/base/linux_syscall_support.h.gcc9 chromium-94.0.4606.54/third_party/tcmalloc/vendor/src/base/linux_syscall_support.h
+--- chromium-94.0.4606.54/third_party/tcmalloc/vendor/src/base/linux_syscall_support.h.gcc9	2021-09-20 15:13:05.000000000 -0400
++++ chromium-94.0.4606.54/third_party/tcmalloc/vendor/src/base/linux_syscall_support.h	2021-09-23 12:41:53.540357702 -0400
+@@ -1485,7 +1485,7 @@ struct kernel_stat {
+                                "d"(LSS_SYSCALL_ARG(parent_tidptr)),
+                                "r"(LSS_SYSCALL_ARG(newtls)),
+                                "r"(LSS_SYSCALL_ARG(child_tidptr))
+-                             : "rsp", "memory", "r8", "r10", "r11", "rcx");
++                             : "memory", "r8", "r10", "r11", "rcx");
+       }
+       LSS_RETURN(int, __res);
+     }

@@ -1,0 +1,31 @@
+From 45bea088d3771c7ff9f77173e451422452c031b3 Mon Sep 17 00:00:00 2001
+From: Stephan Hartmann <stha09@googlemail.com>
+Date: Mon, 02 Aug 2021 16:57:05 +0000
+Subject: [PATCH] GCC: drop WARN_USED_RESULT in lambda in ConversionStorageSql
+
+GCC 9.3 only allows GNU attributes between [] and () in lambda
+expressions. See https://gcc.gnu.org/PR90333 for details. However,
+clang only allows attributes after () only. Seems not strictly
+necessary to enforce the attribute here.
+
+Bug: 819294
+Change-Id: I342deb25239837dea0f6f5e7709b1467789e342b
+---
+
+diff --git a/content/browser/conversions/conversion_storage_sql.cc b/content/browser/conversions/conversion_storage_sql.cc
+index 84bc897..b6fc4e9 100644
+--- a/content/browser/conversions/conversion_storage_sql.cc
++++ b/content/browser/conversions/conversion_storage_sql.cc
+@@ -688,9 +688,11 @@
+ bool ConversionStorageSql::DeleteExpiredImpressions() {
+   const int kMaxDeletesPerBatch = 100;
+ 
++  // GCC accepts attribute between [] and () only
++  // clang accepts attribute after () only
+   auto delete_impressions_from_paged_select =
+       [this](sql::Statement& statement)
+-          VALID_CONTEXT_REQUIRED(sequence_checker_) WARN_UNUSED_RESULT -> bool {
++          VALID_CONTEXT_REQUIRED(sequence_checker_) -> bool {
+     while (true) {
+       std::vector<int64_t> impression_ids;
+       while (statement.Step()) {
