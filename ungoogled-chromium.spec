@@ -335,6 +335,9 @@ Patch503:       chromium-manpage.patch
 # RPM Fusion patches [free/chromium-browser-privacy]:
 Patch600:       chromium-default-user-data-dir.patch
 
+# ungoogled-chromium platform patches
+Patch700:   chromium-94.0.4606.61-ungoogled-pref-fix.patch
+
 # Use chromium-latest.py to generate clean tarball from released build tarballs, found here:
 # http://build.chromium.org/buildbot/official/
 # For Chromium Fedora use chromium-latest.py --stable --ffmpegclean --ffmpegarm
@@ -816,6 +819,9 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 
 # RPM Fusion patches [free/chromium-browser-privacy]:
 %patch600 -p1 -b .default-user-dir
+
+# ungoogled-chromium platform patches
+%patch700 -p1 -b .ungoogled-pref-fix
 
 # Change shebang in all relevant files in this directory and all subdirectories
 # See `man find` for how the `-exec command {} +` syntax works
