@@ -337,6 +337,7 @@ Patch600:       chromium-default-user-data-dir.patch
 
 # ungoogled-chromium platform patches
 Patch700:   chromium-94.0.4606.61-ungoogled-pref-fix.patch
+Patch701:   chromium-94.0.4606.61-ungoogled-safe-browsing-fix.patch
 
 # Use chromium-latest.py to generate clean tarball from released build tarballs, found here:
 # http://build.chromium.org/buildbot/official/
@@ -822,6 +823,7 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 
 # ungoogled-chromium platform patches
 %patch700 -p1 -b .ungoogled-pref-fix
+%patch701 -p1 -b .ungoogled-safebrowsing-fix
 
 # Change shebang in all relevant files in this directory and all subdirectories
 # See `man find` for how the `-exec command {} +` syntax works
@@ -1376,7 +1378,7 @@ tar xf %{SOURCE20}
 %endif
 
 # export PYTHONPATH="../../third_party/pyjson5/src:../../third_party/catapult/third_party/google-endpoints:../../xcb-proto-1.14"
-%if 0%{?rhel} == 8
+%if 0%{?rhel} == 7 || 0%{?rhel} == 8
 export PYTHONPATH="../../third_party/protobuf/third_party/six:../../third_party/pyjson5/src:../../xcb-proto-1.14:../../third_party/catapult/third_party/html5lib-1.1"
 %else
 export PYTHONPATH="../../third_party/pyjson5/src:../../xcb-proto-1.14:../../third_party/catapult/third_party/html5lib-1.1"
