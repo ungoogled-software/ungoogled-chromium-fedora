@@ -184,7 +184,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4606.61
+Version:	%{majorversion}.0.4606.71
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -381,7 +381,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source22:       %{name}.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 94.0.4606.61-1
+%global ungoogled_chromium_revision 94.0.4606.71-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 # We can assume gcc and binutils.
@@ -1623,6 +1623,9 @@ fi
 %endif
 
 %changelog
+* Fri Oct  1 2021 wchen342 <feiyu2817@gmail.com> - 94.0.4606.71-1
+- update Chromium to 94.0.4606.71
+
 * Wed Sep 28 2021 wchen342 <feiyu2817@gmail.com> - 94.0.4606.61-1
 - update Chromium to 94.0.4606.61
 
