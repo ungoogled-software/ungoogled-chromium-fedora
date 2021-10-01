@@ -2,6 +2,8 @@
 
 Fedora/RHEL/CentOS packaging for [ungoogled-chromium](//github.com/Eloston/ungoogled-chromium).
 
+*CentOS and arm builds are provided on a best-effort basis because of various upstream and OBS problems.*
+
 ## Downloads
 
 Pre-built binary rpm files can be found on OBS:
