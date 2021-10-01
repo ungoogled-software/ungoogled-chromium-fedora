@@ -912,7 +912,7 @@ popd
 
 # Core defines are flags that are true for both the browser and headless.
 UNGOOGLED_CHROMIUM_GN_DEFINES=""
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_debug=false is_official_build=false is_unsafe_developer_build=false'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_debug=false is_official_build=false is_unsafe_developer_build=false dcheck_always_on=false'
 %ifarch x86_64 aarch64
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' system_libdir="lib64"'
 %endif
