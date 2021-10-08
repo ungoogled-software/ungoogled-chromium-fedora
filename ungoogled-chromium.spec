@@ -9,12 +9,15 @@
 %endif
 
 # This flag is so I can build things very fast on a giant system.
-# Do not enable in Koji builds.
+# Koji now likes this (as long as I don't build for every target at once).
 %global use_all_cpus 0
 
 %if %{use_all_cpus}
 %global numjobs %{_smp_build_ncpus}
 %endif
+
+# official builds have less debugging and go faster... but we have to shut some things off.
+%global official_build 1
 
 # Fancy build status, so we at least know, where we are..
 # %1 where
@@ -184,7 +187,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4606.71
+Version:	%{majorversion}.0.4606.81
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -264,13 +267,15 @@ Patch79:	chromium-93.0.4577.63-widevine-no-download.patch
 # Fix crashes with components/cast_*
 # Thanks to Gentoo
 Patch80:	chromium-92.0.4515.107-EnumTable-crash.patch
-
 # https://github.com/stha09/chromium-patches/blob/master/chromium-94-ConversionStorageSql-lambda.patch
 Patch81:	chromium-94-ConversionStorageSql-lambda.patch
 # https://github.com/stha09/chromium-patches/blob/master/chromium-94-CustomSpaces-include.patch
 Patch82:	chromium-94-CustomSpaces-include.patch
 # Fixes for python3
 Patch83:	chromium-92.0.4515.107-py3-fixes.patch
+# Add missing cmath header
+Patch84:	chromium-94.0.4606.71-remoting-missing-cmath-header.patch
+
 # Clean up clang-format for python3
 # thanks to Jon Nettleton
 Patch86:	chromium-93.0.4577.63-clang-format.patch
@@ -288,6 +293,12 @@ Patch95:	chromium-93.0.4577.63-mojo-header-fix.patch
 Patch96:	chromium-94.0.4606.54-webrtc-BUILD.gn-fix-multiple-defines.patch
 # Fix extra qualification error
 Patch97:	chromium-94.0.4606.61-remoting-extra-qualification.patch
+# From gentoo
+Patch98:	chromium-94.0.4606.71-InkDropHost-crash.patch
+# From upstream
+# https://chromium.googlesource.com/chromium/src/+/403393b908cefaed09592a4f25fe2cbd46317a68%5E%21/#F0
+Patch99:	chromium-94.0.4606.71-PartitionFree-nullptr-fix.patch
+
 
 
 # Use lstdc++ on EPEL7 only
@@ -334,10 +345,6 @@ Patch503:       chromium-manpage.patch
 
 # RPM Fusion patches [free/chromium-browser-privacy]:
 Patch600:       chromium-default-user-data-dir.patch
-
-# ungoogled-chromium platform patches
-Patch700:   chromium-94.0.4606.61-ungoogled-pref-fix.patch
-Patch701:   chromium-94.0.4606.61-ungoogled-safe-browsing-fix.patch
 
 # Use chromium-latest.py to generate clean tarball from released build tarballs, found here:
 # http://build.chromium.org/buildbot/official/
@@ -778,12 +785,15 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch81 -p1 -b .ConversionStorageSql-lambda-include
 %patch82 -p1 -b .CustomSpaces-include
 %patch83 -p1 -b .py3fixes
+%patch84 -p1 -b .remoting-missing-cmath-header
 %patch86 -p1 -b .clang-format-py3
 %patch93 -p1 -b .vector-fix
 %patch94 -p1 -b .remoting-nodestructor-fix
 %patch95 -p1 -b .mojo-header-fix
 %patch96 -p1 -b .webrtc-BUILD.gn-fix-multiple-defines
 %patch97 -p1 -b .remoting-extra-qualification
+%patch98 -p1 -b .InkDropHost-crash
+%patch99 -p1 -b .PartitionFree-nullptr-fix
 
 
 # EPEL specific patches
@@ -820,10 +830,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 
 # RPM Fusion patches [free/chromium-browser-privacy]:
 %patch600 -p1 -b .default-user-dir
-
-# ungoogled-chromium platform patches
-%patch700 -p1 -b .ungoogled-pref-fix
-%patch701 -p1 -b .ungoogled-safebrowsing-fix
 
 # Change shebang in all relevant files in this directory and all subdirectories
 # See `man find` for how the `-exec command {} +` syntax works
@@ -912,9 +918,13 @@ popd
 
 # Core defines are flags that are true for both the browser and headless.
 UNGOOGLED_CHROMIUM_GN_DEFINES=""
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_debug=false is_official_build=false is_unsafe_developer_build=false dcheck_always_on=false'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_debug=false is_unsafe_developer_build=false dcheck_always_on=false'
 %ifarch x86_64 aarch64
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' system_libdir="lib64"'
+%endif
+%if %{official_build}
+CHROMIUM_CORE_GN_DEFINES+=' is_official_build=true'
+sed -i 's|OFFICIAL_BUILD|GOOGLE_CHROME_BUILD|g' tools/generate_shim_headers/generate_shim_headers.py
 %endif
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' google_api_key="%{api_key}" google_default_client_id="%{default_client_id}" google_default_client_secret="%{default_client_secret}"'
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_clang=false use_sysroot=false disable_fieldtrial_testing_config=true use_lld=false rtc_enable_symbol_export=true'
@@ -1613,9 +1623,11 @@ fi
 %lang(zh_CN) %{chromium_path}/locales/zh-CN.pak*
 %lang(zh_TW) %{chromium_path}/locales/zh-TW.pak*
 # These are psuedolocales, not real ones.
-# So we just include them always.
+# They only get generated when is_official_build=false
+%if ! %{official_build}
 %{chromium_path}/locales/ar-XB.pak*
 %{chromium_path}/locales/en-XA.pak*
+%endif
 
 %{_bindir}/chromedriver
 %{chromium_path}/chromedriver
@@ -1623,16 +1635,19 @@ fi
 %endif
 
 %changelog
+* Fri Oct  8 2021 wchen342 <feiyu2817@gmail.com> - 94.0.4606.81-1
+- update Chromium to 94.0.4606.81
+
 * Fri Oct  1 2021 wchen342 <feiyu2817@gmail.com> - 94.0.4606.71-1
 - update Chromium to 94.0.4606.71
 
-* Wed Sep 28 2021 wchen342 <feiyu2817@gmail.com> - 94.0.4606.61-1
+* Thu Sep 28 2021 wchen342 <feiyu2817@gmail.com> - 94.0.4606.61-1
 - update Chromium to 94.0.4606.61
 
 * Wed Sep 22 2021 wchen342 <feiyu2817@gmail.com> - 93.0.4577.82-1
 - update Chromium to 93.0.4577.82
 
-* Mon Sep  4 2021 wchen342 <feiyu2817@gmail.com> - 93.0.4577.63-1
+* Sat Sep  4 2021 wchen342 <feiyu2817@gmail.com> - 93.0.4577.63-1
 - update Chromium to 93.0.4577.63
 
 * Mon Aug  9 2021 wchen342 <feiyu2817@gmail.com> - 92.0.4515.131-1
