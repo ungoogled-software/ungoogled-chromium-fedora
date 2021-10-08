@@ -48,7 +48,10 @@ The following steps are for Fedora. For CentOS, extra files are needed. See `sou
 4. Copy all other files into `SOURCES`
 
 5. Prepare the following files and copy them into `SOURCES`:
-    * chromium source tarball
+    * chromium source tarball:
+      * If you set `%global freeworld` to 1, get the tarball from `https://commondatastorage.googleapis.com/chromium-browser-official/chromium-%{version}.tar.xz`
+      * If `%global freeworld` is 0 (the default), generate the tarball by running `./chromium-latest.py --version %{version} --ffmpegclean --ffmpegarm`
+      * *Note: DO NOT use the source from Github chromium mirror! The tarball you get will lack files you need to successfully build chromium!*
     * `ungoogled-chromium` src from the corresponding tag ([https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz](https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz))
     * `depot_tools` src tarball ([https://chromium.googlesource.com/chromium/tools/depot_tools.git](https://chromium.googlesource.com/chromium/tools/depot_tools.git))
     * Fonts:
