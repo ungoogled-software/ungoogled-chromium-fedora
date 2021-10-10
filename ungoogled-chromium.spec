@@ -83,8 +83,8 @@
 # dash in -beta and -dev is intentional !
 %global chromium_channel %{nil}
 %global chromium_menu_name Ungoogled Chromium
-%global chromium_browser_channel %{name}%{chromium_channel}
-%global chromium_path %{_libdir}/%{name}%{chromium_channel}
+%global chromium_browser_channel ungoogled-chromium%{chromium_channel}
+%global chromium_path %{_libdir}/ungoogled-chromium%{chromium_channel}
 
 # We don't want any libs in these directories to generate Provides
 # Requires is trickier.
@@ -362,7 +362,7 @@ Source0:	chromium-%{version}-clean.tar.xz
 %endif
 # Packaged by OBS from https://chromium.googlesource.com/chromium/tools/depot_tools.git
 Source2:	depot_tools-%{depot_tools_revision}.tar.xz
-Source3:	%{name}.sh
+Source3:	ungoogled-chromium.sh
 Source4:	%{chromium_browser_channel}.desktop
 # Also, only used if you want to reproduce the clean tarball.
 Source5:	clean_ffmpeg.sh
@@ -389,7 +389,7 @@ Source21:	https://nodejs.org/dist/latest-v12.x/node-v12.22.6-linux-arm64.tar.xz
 Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 
 # Add our own appdata file.
-Source22:       %{name}.appdata.xml
+Source22:       ungoogled-chromium.appdata.xml
 
 # ungoogled-chromium source
 %global ungoogled_chromium_revision 94.0.4606.81-1
@@ -925,13 +925,13 @@ popd
 %endif
 
 # Core defines are flags that are true for both the browser and headless.
-UNGOOGLED_CHROMIUM_GN_DEFINES=""
+UNGOOGLED_CHROMIUM_GN_DEFINES=''
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_debug=false is_unsafe_developer_build=false dcheck_always_on=false'
 %ifarch x86_64 aarch64
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' system_libdir="lib64"'
 %endif
 %if %{official_build}
-CHROMIUM_CORE_GN_DEFINES+=' is_official_build=true'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' is_official_build=true use_thin_lto=false is_cfi=false'
 sed -i 's|OFFICIAL_BUILD|GOOGLE_CHROME_BUILD|g' tools/generate_shim_headers/generate_shim_headers.py
 %endif
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' google_api_key="%{api_key}" google_default_client_id="%{default_client_id}" google_default_client_secret="%{default_client_secret}"'
@@ -1404,9 +1404,6 @@ export PYTHONPATH="../../third_party/pyjson5/src:../../xcb-proto-1.14:../../thir
 
 echo
 # Now do the full browser
-%if 0%{freeworld}
-%build_target %{builddir} media
-%else
 %build_target %{builddir} chrome
 %build_target %{builddir} chrome_sandbox
 %build_target %{builddir} chromedriver
@@ -1414,116 +1411,101 @@ echo
 %build_target %{builddir} clear_key_cdm
 %endif
 %build_target %{builddir} policy_templates
-%endif
 
 %install
 rm -rf %{buildroot}
 
-%if 0%{freeworld}
-	mkdir -p %{buildroot}%{chromium_path}
-
-	pushd %{builddir}
-		cp -a libffmpeg.so* %{buildroot}%{chromium_path}
-		cp -a libmedia.so* %{buildroot}%{chromium_path}
-		mv %{buildroot}%{chromium_path}/libffmpeg.so{,.%{lsuffix}}
-		mv %{buildroot}%{chromium_path}/libffmpeg.so.TOC{,.%{lsuffix}}
-		mv %{buildroot}%{chromium_path}/libmedia.so{,.%{lsuffix}}
-		mv %{buildroot}%{chromium_path}/libmedia.so.TOC{,.%{lsuffix}}
-	popd
+mkdir -p %{buildroot}%{_bindir}
+mkdir -p %{buildroot}%{chromium_path}
+cp -a %{SOURCE3} %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
+export BUILD_TARGET=`cat /etc/redhat-release`
+export CHROMIUM_PATH=%{chromium_path}
+export CHROMIUM_BROWSER_CHANNEL=%{chromium_browser_channel}
+sed -i "s|@@BUILD_TARGET@@|$BUILD_TARGET|g" %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
+sed -i "s|@@CHROMIUM_PATH@@|$CHROMIUM_PATH|g" %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
+sed -i "s|@@CHROMIUM_BROWSER_CHANNEL@@|$CHROMIUM_BROWSER_CHANNEL|g" %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
+%if "%{chromium_channel}" == "%{nil}"
+    sed -i "s|@@EXTRA_FLAGS@@||g" %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
 %else
-	mkdir -p %{buildroot}%{_bindir}
-	mkdir -p %{buildroot}%{chromium_path}
-	cp -a %{SOURCE3} %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
-	export BUILD_TARGET=`cat /etc/redhat-release`
-	export CHROMIUM_PATH=%{chromium_path}
-	export CHROMIUM_BROWSER_CHANNEL=%{chromium_browser_channel}
-	sed -i "s|@@BUILD_TARGET@@|$BUILD_TARGET|g" %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
-	sed -i "s|@@CHROMIUM_PATH@@|$CHROMIUM_PATH|g" %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
-	sed -i "s|@@CHROMIUM_BROWSER_CHANNEL@@|$CHROMIUM_BROWSER_CHANNEL|g" %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
-	%if "%{chromium_channel}" == "%{nil}"
-		sed -i "s|@@EXTRA_FLAGS@@||g" %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
-	%else
-		# Enable debug outputs for beta and dev channels
-		export EXTRA_FLAGS="--enable-logging=stderr --v=2"
-		sed -i "s|@@EXTRA_FLAGS@@|$EXTRA_FLAGS|g" %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
-	%endif
-
-	ln -s %{chromium_path}/%{chromium_browser_channel}.sh %{buildroot}%{_bindir}/%{chromium_browser_channel}
-	mkdir -p %{buildroot}%{_mandir}/man1/
-
-	pushd %{builddir}
-		cp -a *.pak locales resources icudtl.dat %{buildroot}%{chromium_path}
-		%ifarch x86_64 i686 aarch64
-			cp -a swiftshader %{buildroot}%{chromium_path}
-		%endif
-		cp -a chrome %{buildroot}%{chromium_path}/%{chromium_browser_channel}
-		cp -a chrome_sandbox %{buildroot}%{chromium_path}/chrome-sandbox
-		cp -a chrome_crashpad_handler %{buildroot}%{chromium_path}/chrome_crashpad_handler
-		cp -a ../../chrome/app/resources/manpage.1.in %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
-		sed -i "s|@@PACKAGE@@|%{chromium_browser_channel}|g" %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
-		sed -i "s|@@MENUNAME@@|%{chromium_menu_name}|g" %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
-		# V8 initial snapshots
-		# https://code.google.com/p/chromium/issues/detail?id=421063
-		cp -a snapshot_blob.bin %{buildroot}%{chromium_path}
-		cp -a v8_context_snapshot.bin %{buildroot}%{chromium_path}
-		cp -a xdg-mime xdg-settings %{buildroot}%{chromium_path}
-		# This is ANGLE, not to be confused with the similarly named files under swiftshader/
-		cp -a libEGL.so* libGLESv2.so* %{buildroot}%{chromium_path}
-
-		%if %{build_clear_key_cdm}
-			%ifarch i686
-				cp -a ClearKeyCdm/_platform_specific/linux_x86/libclearkeycdm.so %{buildroot}%{chromium_path}
-			%else
-				%ifarch x86_64
-					cp -a ClearKeyCdm/_platform_specific/linux_x64/libclearkeycdm.so %{buildroot}%{chromium_path}
-				%else
-					%ifarch aarch64
-						cp -a ClearKeyCdm/_platform_specific/linux_arm64/libclearkeycdm.so %{buildroot}%{chromium_path}
-					%else
-						cp -a libclearkeycdm.so %{buildroot}%{chromium_path}
-					%endif
-				%endif
-			%endif
-		%endif
-
-		# chromedriver
-		cp -a chromedriver %{buildroot}%{chromium_path}/chromedriver
-		ln -s %{chromium_path}/chromedriver %{buildroot}%{_bindir}/chromedriver
-	popd
-
-	# Add directories for policy management
-	mkdir -p %{buildroot}%{_sysconfdir}/chromium/policies/managed
-	mkdir -p %{buildroot}%{_sysconfdir}/chromium/policies/recommended
-
-	cp -a out/Release/gen/chrome/app/policy/common/html/en-US/*.html .
-	cp -a out/Release/gen/chrome/app/policy/linux/examples/chrome.json .
-
-	mkdir -p %{buildroot}%{_datadir}/icons/hicolor/256x256/apps
-	cp -a chrome/app/theme/chromium/product_logo_256.png %{buildroot}%{_datadir}/icons/hicolor/256x256/apps/%{chromium_browser_channel}.png
-	mkdir -p %{buildroot}%{_datadir}/icons/hicolor/128x128/apps
-	cp -a chrome/app/theme/chromium/product_logo_128.png %{buildroot}%{_datadir}/icons/hicolor/128x128/apps/%{chromium_browser_channel}.png
-	mkdir -p %{buildroot}%{_datadir}/icons/hicolor/64x64/apps
-	cp -a chrome/app/theme/chromium/product_logo_64.png %{buildroot}%{_datadir}/icons/hicolor/64x64/apps/%{chromium_browser_channel}.png
-	mkdir -p %{buildroot}%{_datadir}/icons/hicolor/48x48/apps
-	cp -a chrome/app/theme/chromium/product_logo_48.png %{buildroot}%{_datadir}/icons/hicolor/48x48/apps/%{chromium_browser_channel}.png
-	mkdir -p %{buildroot}%{_datadir}/icons/hicolor/24x24/apps
-	cp -a chrome/app/theme/chromium/product_logo_24.png %{buildroot}%{_datadir}/icons/hicolor/24x24/apps/%{chromium_browser_channel}.png
-
-	# Install the master_preferences file
-	mkdir -p %{buildroot}%{_sysconfdir}/%{name}
-	install -m 0644 %{SOURCE13} %{buildroot}%{_sysconfdir}/%{name}/
-
-	mkdir -p %{buildroot}%{_datadir}/applications/
-	desktop-file-install --dir %{buildroot}%{_datadir}/applications %{SOURCE4}
-
-	install -D -m0644 %{SOURCE22} ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{chromium_browser_channel}.appdata.xml
-	appstream-util validate-relax --nonet ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{chromium_browser_channel}.appdata.xml
-
-	mkdir -p %{buildroot}%{_datadir}/gnome-control-center/default-apps/
-	cp -a %{SOURCE9} %{buildroot}%{_datadir}/gnome-control-center/default-apps/
-
-# freeworld conditional
+    # Enable debug outputs for beta and dev channels
+    export EXTRA_FLAGS="--enable-logging=stderr --v=2"
+    sed -i "s|@@EXTRA_FLAGS@@|$EXTRA_FLAGS|g" %{buildroot}%{chromium_path}/%{chromium_browser_channel}.sh
 %endif
+
+ln -s %{chromium_path}/%{chromium_browser_channel}.sh %{buildroot}%{_bindir}/%{chromium_browser_channel}
+mkdir -p %{buildroot}%{_mandir}/man1/
+
+pushd %{builddir}
+    cp -a *.pak locales resources icudtl.dat %{buildroot}%{chromium_path}
+    %ifarch x86_64 i686 aarch64
+        cp -a swiftshader %{buildroot}%{chromium_path}
+    %endif
+    cp -a chrome %{buildroot}%{chromium_path}/%{chromium_browser_channel}
+    cp -a chrome_sandbox %{buildroot}%{chromium_path}/chrome-sandbox
+    cp -a chrome_crashpad_handler %{buildroot}%{chromium_path}/chrome_crashpad_handler
+    cp -a ../../chrome/app/resources/manpage.1.in %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
+    sed -i "s|@@PACKAGE@@|%{chromium_browser_channel}|g" %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
+    sed -i "s|@@MENUNAME@@|%{chromium_menu_name}|g" %{buildroot}%{_mandir}/man1/%{chromium_browser_channel}.1
+    # V8 initial snapshots
+    # https://code.google.com/p/chromium/issues/detail?id=421063
+    cp -a snapshot_blob.bin %{buildroot}%{chromium_path}
+    cp -a v8_context_snapshot.bin %{buildroot}%{chromium_path}
+    cp -a xdg-mime xdg-settings %{buildroot}%{chromium_path}
+    # This is ANGLE, not to be confused with the similarly named files under swiftshader/
+    cp -a libEGL.so* libGLESv2.so* %{buildroot}%{chromium_path}
+
+    %if %{build_clear_key_cdm}
+        %ifarch i686
+            cp -a ClearKeyCdm/_platform_specific/linux_x86/libclearkeycdm.so %{buildroot}%{chromium_path}
+        %else
+            %ifarch x86_64
+                cp -a ClearKeyCdm/_platform_specific/linux_x64/libclearkeycdm.so %{buildroot}%{chromium_path}
+            %else
+                %ifarch aarch64
+                    cp -a ClearKeyCdm/_platform_specific/linux_arm64/libclearkeycdm.so %{buildroot}%{chromium_path}
+                %else
+                    cp -a libclearkeycdm.so %{buildroot}%{chromium_path}
+                %endif
+            %endif
+        %endif
+    %endif
+
+    # chromedriver
+    cp -a chromedriver %{buildroot}%{chromium_path}/chromedriver
+    ln -s %{chromium_path}/chromedriver %{buildroot}%{_bindir}/chromedriver
+popd
+
+# Add directories for policy management
+mkdir -p %{buildroot}%{_sysconfdir}/chromium/policies/managed
+mkdir -p %{buildroot}%{_sysconfdir}/chromium/policies/recommended
+
+cp -a out/Release/gen/chrome/app/policy/common/html/en-US/*.html .
+cp -a out/Release/gen/chrome/app/policy/linux/examples/chrome.json .
+
+mkdir -p %{buildroot}%{_datadir}/icons/hicolor/256x256/apps
+cp -a chrome/app/theme/chromium/product_logo_256.png %{buildroot}%{_datadir}/icons/hicolor/256x256/apps/%{chromium_browser_channel}.png
+mkdir -p %{buildroot}%{_datadir}/icons/hicolor/128x128/apps
+cp -a chrome/app/theme/chromium/product_logo_128.png %{buildroot}%{_datadir}/icons/hicolor/128x128/apps/%{chromium_browser_channel}.png
+mkdir -p %{buildroot}%{_datadir}/icons/hicolor/64x64/apps
+cp -a chrome/app/theme/chromium/product_logo_64.png %{buildroot}%{_datadir}/icons/hicolor/64x64/apps/%{chromium_browser_channel}.png
+mkdir -p %{buildroot}%{_datadir}/icons/hicolor/48x48/apps
+cp -a chrome/app/theme/chromium/product_logo_48.png %{buildroot}%{_datadir}/icons/hicolor/48x48/apps/%{chromium_browser_channel}.png
+mkdir -p %{buildroot}%{_datadir}/icons/hicolor/24x24/apps
+cp -a chrome/app/theme/chromium/product_logo_24.png %{buildroot}%{_datadir}/icons/hicolor/24x24/apps/%{chromium_browser_channel}.png
+
+# Install the master_preferences file
+mkdir -p %{buildroot}%{_sysconfdir}/%{name}
+install -m 0644 %{SOURCE13} %{buildroot}%{_sysconfdir}/%{name}/
+
+mkdir -p %{buildroot}%{_datadir}/applications/
+desktop-file-install --dir %{buildroot}%{_datadir}/applications %{SOURCE4}
+
+install -D -m0644 %{SOURCE22} ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{chromium_browser_channel}.appdata.xml
+appstream-util validate-relax --nonet ${RPM_BUILD_ROOT}%{_datadir}/metainfo/%{chromium_browser_channel}.appdata.xml
+
+mkdir -p %{buildroot}%{_datadir}/gnome-control-center/default-apps/
+cp -a %{SOURCE9} %{buildroot}%{_datadir}/gnome-control-center/default-apps/
+
 
 %post
 # Set SELinux labels - semanage itself will adjust the lib directory naming
@@ -1534,10 +1516,6 @@ if selinuxenabled; then
 	semanage fcontext -a -t chrome_sandbox_exec_t /usr/lib/chrome-sandbox &>/dev/null || :
 	restorecon -R -v %{chromium_path}/%{chromium_browser_channel} &>/dev/null || :
 fi
-
-%if 0%{freeworld}
-# We only build libs-media-freeworld.
-%else
 
 %files
 %doc AUTHORS
@@ -1632,15 +1610,13 @@ fi
 %lang(zh_TW) %{chromium_path}/locales/zh-TW.pak*
 # These are psuedolocales, not real ones.
 # They only get generated when is_official_build=false
-%if ! %{official_build}
+%if !%{official_build}
 %{chromium_path}/locales/ar-XB.pak*
 %{chromium_path}/locales/en-XA.pak*
 %endif
 
 %{_bindir}/chromedriver
 %{chromium_path}/chromedriver
-
-%endif
 
 %changelog
 * Fri Oct  8 2021 wchen342 <feiyu2817@gmail.com> - 94.0.4606.81-1
