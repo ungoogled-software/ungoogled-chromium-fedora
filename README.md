@@ -1,8 +1,10 @@
 # ungoogled-chromium-fedora
 
-Fedora/RHEL/CentOS packaging for [ungoogled-chromium](//github.com/Eloston/ungoogled-chromium).
+Fedora packaging for [ungoogled-chromium](//github.com/Eloston/ungoogled-chromium).
 
-*CentOS and arm builds are provided on a best-effort basis because of various upstream and OBS problems.*
+*CentOS 7 has reached EOL and CentOS 8 will reach EOL at the end of 2021, thus CentOS builds will no longer be provided. aarch64 builds are provided on a best-effort basis.*
+
+**!!!WARNING: For legal reasons, the binaries we provide on OBS do not contain proprietary codecs. This includes MPEG families, H264 and other common codecs. If you wish to use those codecs, either compile yourself or use the Flatpak package instead!!!**
 
 ## Downloads
 
@@ -10,7 +12,6 @@ Pre-built binary rpm files can be found on OBS:
   * Direct Download
     - [OBS Production Project](https://build.opensuse.org/project/show/home:ungoogled_chromium)
     - [OBS Development Project](https://build.opensuse.org/project/show/home:ungoogled_chromium:testing)
-    - [My OBS project download page](https://software.opensuse.org//download.html?project=home%3Awchen342%3Aungoogled-chromium-fedora&package=ungoogled-chromium)
 
   * RPM repository
     - OBS (Fedora 34)
@@ -22,18 +23,6 @@ Pre-built binary rpm files can be found on OBS:
       ```sh
       # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:/ungoogled_chromium/Fedora_33/home:ungoogled_chromium.repo
       # dnf install ungoogled-chromium
-      ```
-    - OBS (CentOS 8)
-      ```sh
-      # cd /etc/yum.repos.d/
-      # wget https://download.opensuse.org/repositories/home:/ungoogled_chromium/CentOS_8/home:ungoogled_chromium.repo
-      # yum install ungoogled-chromium
-      ```
-    - OBS (CentOS 7)
-      ```sh
-      # cd /etc/yum.repos.d/
-      # wget https://download.opensuse.org/repositories/home:/ungoogled_chromium/CentOS_7/home:ungoogled_chromium.repo
-      # yum install ungoogled-chromium
       ```
 
 ## Building
