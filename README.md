@@ -14,14 +14,14 @@ Pre-built binary rpm files can be found on OBS:
     - [OBS Development Project](https://build.opensuse.org/project/show/home:ungoogled_chromium:testing)
 
   * RPM repository
+    - OBS (Fedora 35)
+      ```sh
+      # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:/ungoogled_chromium/Fedora_35/home:ungoogled_chromium.repo
+      # dnf install ungoogled-chromium
+      ```
     - OBS (Fedora 34)
       ```sh
       # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:/ungoogled_chromium/Fedora_34/home:ungoogled_chromium.repo
-      # dnf install ungoogled-chromium
-      ```
-    - OBS (Fedora 33)
-      ```sh
-      # dnf config-manager --add-repo https://download.opensuse.org/repositories/home:/ungoogled_chromium/Fedora_33/home:ungoogled_chromium.repo
       # dnf install ungoogled-chromium
       ```
 

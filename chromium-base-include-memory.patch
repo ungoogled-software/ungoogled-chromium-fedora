@@ -1,0 +1,11 @@
+diff --git a/base/command_line.h b/base/command_line.h
+--- a/base/command_line.h
++++ b/base/command_line.h
+@@ -21,6 +21,7 @@
+ #include <map>
+ #include <string>
+ #include <vector>
++#include <memory>
+
+ #include "base/base_export.h"
+ #include "base/strings/string_piece.h"

@@ -142,18 +142,18 @@ BuildRequires:  libicu-devel >= 5.4
 #Build with debugging symbols
 %global debug_pkg 0
 
-%global majorversion 95
+%global majorversion 96
 %global revision 1
 
 # Depot tools revision
-%global depot_tools_revision 78f91964318b870d274009a77b345920b5b93043
+%global depot_tools_revision dc86a4b9044f9243886ca0da0c1753820ac51f45
 
 %if %{freeworld}
 Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4638.69
+Version:	%{majorversion}.0.4664.45
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -173,13 +173,10 @@ Patch2:		chromium-67.0.3396.62-gn-system.patch
 Patch3:		chromium-60.0.3112.78-no-libpng-prefix.patch
 # Do not mangle zlib
 Patch5:		chromium-77.0.3865.75-no-zlib-mangle.patch
-# Disable fontconfig cache magic that breaks remoting
-Patch8:		chromium-91.0.4472.77-disable-fontconfig-cache-magic.patch
 # Try to load widevine from other places
 Patch10:	chromium-92.0.4515.107-widevine-other-locations.patch
 # Tell bootstrap.py to always use the version of Python we specify
 Patch11:        chromium-93.0.4577.63-py3-bootstrap.patch
-
 # https://gitweb.gentoo.org/repo/gentoo.git/tree/www-client/chromium/files/chromium-unbundle-zlib.patch
 Patch52:	chromium-81.0.4044.92-unbundle-zlib.patch
 # Fix issue where closure_compiler thinks java is only allowed in android builds
@@ -194,28 +191,17 @@ Patch76:	chromium-92.0.4515.107-rawhide-gcc-std-max-fix.patch
 Patch79:	chromium-93.0.4577.63-widevine-no-download.patch
 # Fix crashes with components/cast_*
 # Thanks to Gentoo
-Patch80:	chromium-92.0.4515.107-EnumTable-crash.patch
-# Fixes for python3
-Patch83:	chromium-92.0.4515.107-py3-fixes.patch
+Patch80:	chromium-96.0.4664.45-EnumTable-crash.patch
 
 # Clean up clang-format for python3
 # thanks to Jon Nettleton
 Patch86:	chromium-93.0.4577.63-clang-format.patch
-# In file included from ../../components/cast_channel/enum_table.cc:5:
-# ../../components/cast_channel/enum_table.h:359:18: error: 'vector' in namespace 'std' does not name a template type
-#   359 |       const std::vector<Entry> data_;
-#       |                  ^~~~~~
-# ../../components/cast_channel/enum_table.h:18:1: note: 'std::vector' is defined in header '<vector>'; did you forget to '#include <vector>'?
-Patch93:	chromium-93.0.4577.63-vector-fix.patch
 # include full UrlResponseHead header
 Patch95:	chromium-93.0.4577.63-mojo-header-fix.patch
 # Fix multiple defines issue in webrtc/BUILD.gn
 Patch96:	chromium-94.0.4606.54-webrtc-BUILD.gn-fix-multiple-defines.patch
 # From gentoo
 Patch98:	chromium-94.0.4606.71-InkDropHost-crash.patch
-# From upstream
-# https://chromium.googlesource.com/chromium/src/+/403393b908cefaed09592a4f25fe2cbd46317a68%5E%21/#F0
-Patch99:	chromium-94.0.4606.71-PartitionFree-nullptr-fix.patch
 
 
 # VAAPI
@@ -230,7 +216,14 @@ Patch300:	chromium-92.0.4515.107-rhel8-force-disable-use_gnome_keyring.patch
 # Fixes from Gentoo
 Patch400:   chromium-glibc-2.34.patch
 Patch401:   chromium-VirtualCursor-standard-layout.patch
-Patch402:   chromium-quiche-size_t.patch
+
+Patch405:   chromium-base-include-memory.patch
+Patch407:   chromium-96-DrmRenderNodePathFinder-include.patch
+Patch408:   chromium-commerce-coupons-coupon_db-vector.patch
+
+# Thanks void linux
+Patch406:   chromium-96-RestrictedCookieManager-tuple.patch
+
 # Clang 12 cflags
 Patch403:   chromium-clang-12-cflags.patch
 Patch404:   chromium-clang-sanitizer-cflags.patch
@@ -281,7 +274,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source22:       ungoogled-chromium.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 95.0.4638.69-1
+%global ungoogled_chromium_revision 96.0.4664.45-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 BuildRequires:	llvm
@@ -385,8 +378,13 @@ BuildRequires:	libudev-devel
 %if %{bundlelibusbx}
 # Do nothing
 %else
+%if 0%{?fedora} >= 35
+Requires:	libusb1 >= 1.0.24-4
+BuildRequires:	libusb1-devel >= 1.0.24-4
+%else
 Requires:	libusbx >= 1.0.21-0.1.git448584a
 BuildRequires:	libusbx-devel >= 1.0.21-0.1.git448584a
+%endif
 %endif
 BuildRequires:	libva-devel
 # We don't use libvpx anymore because Chromium loves to
@@ -565,7 +563,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch2 -p1 -b .gnsystem
 %patch3 -p1 -b .nolibpngprefix
 %patch5 -p1 -b .nozlibmangle
-%patch8 -p1 -b .nofontconfigcache
 %patch10 -p1 -b .widevine-other-locations
 %if 0%{?build_with_python3}
 %patch11 -p1 -b .py3
@@ -582,13 +579,10 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %endif
 %patch79 -p1 -b .widevine-no-download
 %patch80 -p1 -b .EnumTable-crash
-%patch83 -p1 -b .py3fixes
 %patch86 -p1 -b .clang-format-py3
-%patch93 -p1 -b .vector-fix
 %patch95 -p1 -b .mojo-header-fix
 %patch96 -p1 -b .webrtc-BUILD.gn-fix-multiple-defines
 %patch98 -p1 -b .InkDropHost-crash
-%patch99 -p1 -b .PartitionFree-nullptr-fix
 
 # Feature specific patches
 %if %{use_vaapi}
@@ -605,7 +599,12 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 # glibc fix
 %patch400 -p1 -b .glibc-2.34
 %patch401 -p1 -b .virtualcursor
-%patch402 -p1 -b .quiche-size_t
+%patch405 -p1 -b .base-include-memory
+%patch406 -p1 -b .restrictedcookiemanager-tuple
+%patch407 -p1 -b .drmrendernodepathfinder
+%patch408 -p1 -b .commerce-coupons-coupon_db-vector
+
+# cflags
 %if 0%{?fedora} < 35
 %patch403 -p1 -b .clang-12-cflags
 %endif
@@ -808,6 +807,8 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/devtools-frontend/src/front_end/third_party/puppeteer' \
 	'third_party/devtools-frontend/src/front_end/third_party/wasmparser' \
 	'third_party/devtools-frontend/src/test/unittests/front_end/third_party/i18n' \
+	'third_party/devtools-frontend/src/third_party' \
+	'third_party/distributed_point_functions' \
 	'third_party/dom_distiller_js' \
 	'third_party/eigen3' \
 	'third_party/emoji-segmenter' \
@@ -876,6 +877,9 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/lss' \
 	'third_party/lzma_sdk' \
 	'third_party/mako' \
+	'third_party/maldoca' \
+	'third_party/maldoca/src/third_party/tensorflow_protos' \
+	'third_party/maldoca/src/third_party/zlibwrapper' \
 	'third_party/markupsafe' \
 	'third_party/mesa' \
 	'third_party/metrics_proto' \
@@ -950,7 +954,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/tflite' \
 	'third_party/tflite/src/third_party/eigen3' \
 	'third_party/tflite/src/third_party/fft2d' \
-	'third_party/tflite-support' \
+	'third_party/tflite_support' \
 	'third_party/ukey2' \
     'third_party/usb_ids' \
 	'third_party/usrsctp' \
@@ -1328,6 +1332,9 @@ fi
 %{chromium_path}/chromedriver
 
 %changelog
+* Thu Nov  18 2021 wchen342 <feiyu2817@gmail.com> - 96.0.4664.45-1
+- update Chromium to 96.0.4664.45
+
 * Thu Nov  11 2021 wchen342 <feiyu2817@gmail.com> - 95.0.4638.69-1
 - update Chromium to 95.0.4638.69
 - Use clang instead of gcc

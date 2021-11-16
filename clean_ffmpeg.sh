@@ -238,6 +238,7 @@ manual_files="	libavcodec/aarch64/fft_neon.S \
 		libavcodec/mdct15.c \
 		libavcodec/mdct_template.c \
 		libavcodec/options.c \
+		libavcodec/pcm.c \
 		libavcodec/pel_template.c \
 		libavcodec/utils.c \
 		libavcodec/videodsp.c \

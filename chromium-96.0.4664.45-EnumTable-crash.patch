@@ -1,26 +1,32 @@
-diff -up chromium-92.0.4515.107/components/cast_channel/enum_table.h.EnumTable-crash chromium-92.0.4515.107/components/cast_channel/enum_table.h
---- chromium-92.0.4515.107/components/cast_channel/enum_table.h.EnumTable-crash	2021-07-19 14:45:12.000000000 -0400
-+++ chromium-92.0.4515.107/components/cast_channel/enum_table.h	2021-07-26 17:41:21.987375385 -0400
-@@ -212,7 +212,7 @@ class
- 
-   template <typename E>
-   friend class EnumTable;
--  DISALLOW_COPY_AND_ASSIGN(GenericEnumTableEntry);
-+  DISALLOW_ASSIGN(GenericEnumTableEntry);
- };
- 
- // Yes, these constructors really needs to be inlined.  Even though they look
-@@ -250,8 +250,7 @@ class EnumTable {
-     // Constructor for regular entries.
+diff --git a/components/cast_channel/enum_table.h b/components/cast_channel/enum_table.h
+index aad9e08..2f3fcad 100644
+--- a/components/cast_channel/enum_table.h
++++ b/components/cast_channel/enum_table.h
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <cstring>
+ #include <ostream>
++#include <vector>
+
+ #include "base/check_op.h"
+ #include "base/macros.h"
+@@ -188,7 +189,6 @@ class
+   inline constexpr GenericEnumTableEntry(int32_t value);
+   inline constexpr GenericEnumTableEntry(int32_t value, base::StringPiece str);
+
+-  GenericEnumTableEntry(const GenericEnumTableEntry&) = delete;
+   GenericEnumTableEntry& operator=(const GenericEnumTableEntry&) = delete;
+
+  private:
+@@ -254,7 +254,6 @@ class EnumTable {
      constexpr Entry(E value, base::StringPiece str)
          : GenericEnumTableEntry(static_cast<int32_t>(value), str) {}
--
--    DISALLOW_COPY_AND_ASSIGN(Entry);
-+    DISALLOW_ASSIGN(Entry);
+
+-    Entry(const Entry&) = delete;
+     Entry& operator=(const Entry&) = delete;
    };
- 
-   static_assert(sizeof(E) <= sizeof(int32_t),
-@@ -306,15 +305,14 @@ class EnumTable {
+
+@@ -313,15 +312,14 @@ class EnumTable {
      if (is_sorted_) {
        const std::size_t index = static_cast<std::size_t>(value);
        if (ANALYZER_ASSUME_TRUE(index < data_.size())) {
@@ -36,9 +42,9 @@ diff -up chromium-92.0.4515.107/components/cast_channel/enum_table.h.EnumTable-c
 -        data_.size(), static_cast<int32_t>(value));
 +        &data_[0], data_.size(), static_cast<int32_t>(value));
    }
- 
+
    // This overload of GetString is designed for cases where the argument is a
-@@ -342,8 +340,7 @@ class EnumTable {
+@@ -349,8 +347,7 @@ class EnumTable {
    // enum value directly.
    absl::optional<E> GetEnum(base::StringPiece str) const {
      auto* entry = GenericEnumTableEntry::FindByString(
@@ -47,17 +53,17 @@ diff -up chromium-92.0.4515.107/components/cast_channel/enum_table.h.EnumTable-c
 +        &data_[0], data_.size(), str);
      return entry ? static_cast<E>(entry->value) : absl::optional<E>();
    }
- 
-@@ -358,7 +355,7 @@ class EnumTable {
+
+@@ -365,7 +362,7 @@ class EnumTable {
    // Align the data on a cache line boundary.
    alignas(64)
  #endif
 -      std::initializer_list<Entry> data_;
 +      const std::vector<Entry> data_;
    bool is_sorted_;
- 
+
    constexpr EnumTable(std::initializer_list<Entry> data, bool is_sorted)
-@@ -370,8 +367,8 @@ class EnumTable {
+@@ -377,8 +374,8 @@ class EnumTable {
  
      for (std::size_t i = 0; i < data.size(); i++) {
        for (std::size_t j = i + 1; j < data.size(); j++) {
