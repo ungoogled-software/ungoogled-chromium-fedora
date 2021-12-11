@@ -7,25 +7,25 @@ index aad9e08..2f3fcad 100644
  #include <cstring>
  #include <ostream>
 +#include <vector>
-
+ 
  #include "base/check_op.h"
  #include "base/macros.h"
 @@ -188,7 +189,6 @@ class
    inline constexpr GenericEnumTableEntry(int32_t value);
    inline constexpr GenericEnumTableEntry(int32_t value, base::StringPiece str);
-
+ 
 -  GenericEnumTableEntry(const GenericEnumTableEntry&) = delete;
    GenericEnumTableEntry& operator=(const GenericEnumTableEntry&) = delete;
-
+ 
   private:
 @@ -254,7 +254,6 @@ class EnumTable {
      constexpr Entry(E value, base::StringPiece str)
          : GenericEnumTableEntry(static_cast<int32_t>(value), str) {}
-
+ 
 -    Entry(const Entry&) = delete;
      Entry& operator=(const Entry&) = delete;
    };
-
+ 
 @@ -313,15 +312,14 @@ class EnumTable {
      if (is_sorted_) {
        const std::size_t index = static_cast<std::size_t>(value);
@@ -42,7 +42,7 @@ index aad9e08..2f3fcad 100644
 -        data_.size(), static_cast<int32_t>(value));
 +        &data_[0], data_.size(), static_cast<int32_t>(value));
    }
-
+ 
    // This overload of GetString is designed for cases where the argument is a
 @@ -349,8 +347,7 @@ class EnumTable {
    // enum value directly.
@@ -53,7 +53,7 @@ index aad9e08..2f3fcad 100644
 +        &data_[0], data_.size(), str);
      return entry ? static_cast<E>(entry->value) : absl::optional<E>();
    }
-
+ 
 @@ -365,7 +362,7 @@ class EnumTable {
    // Align the data on a cache line boundary.
    alignas(64)
@@ -61,7 +61,7 @@ index aad9e08..2f3fcad 100644
 -      std::initializer_list<Entry> data_;
 +      const std::vector<Entry> data_;
    bool is_sorted_;
-
+ 
    constexpr EnumTable(std::initializer_list<Entry> data, bool is_sorted)
 @@ -377,8 +374,8 @@ class EnumTable {
  

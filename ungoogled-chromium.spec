@@ -115,12 +115,8 @@ BuildRequires:  libicu-devel >= 5.4
 # Hopefully it does not anymore.
 %global gtk3 1
 
-# As of Chromium 94, it uses functions in harfbuzz 2.9.0+, which is only found in F36+.
-%if 0%{?fedora} >= 36
-%global bundleharfbuzz 0
-%else
+
 %global bundleharfbuzz 1
-%endif
 %global bundleopus 1
 %global bundlelibusbx 0
 %global bundlelibwebp 0
@@ -153,7 +149,7 @@ Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4664.45
+Version:	%{majorversion}.0.4664.93
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -179,9 +175,17 @@ Patch10:	chromium-92.0.4515.107-widevine-other-locations.patch
 Patch11:        chromium-93.0.4577.63-py3-bootstrap.patch
 # https://gitweb.gentoo.org/repo/gentoo.git/tree/www-client/chromium/files/chromium-unbundle-zlib.patch
 Patch52:	chromium-81.0.4044.92-unbundle-zlib.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-96-CouponDB-include.patch
+Patch59:	chromium-96-CouponDB-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-96-CommandLine-include.patch
+Patch61:	chromium-96-CommandLine-include.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-96-RestrictedCookieManager-tuple.patch
+Patch62:	chromium-96-RestrictedCookieManager-tuple.patch
+# https://github.com/stha09/chromium-patches/blob/master/chromium-96-DrmRenderNodePathFinder-include.patch
+Patch63:	chromium-96-DrmRenderNodePathFinder-include.patch
 # Fix issue where closure_compiler thinks java is only allowed in android builds
 # https://bugs.chromium.org/p/chromium/issues/detail?id=1192875
-Patch64:	chromium-91.0.4472.77-java-only-allowed-in-android-builds.patch
+Patch65:	chromium-91.0.4472.77-java-only-allowed-in-android-builds.patch
 
 # Work around binutils bug in aarch64 (F33+)
 Patch68:	chromium-84.0.4147.125-aarch64-clearkeycdm-binutils-workaround.patch
@@ -189,13 +193,14 @@ Patch68:	chromium-84.0.4147.125-aarch64-clearkeycdm-binutils-workaround.patch
 Patch76:	chromium-92.0.4515.107-rawhide-gcc-std-max-fix.patch
 # Do not download proprietary widevine module in the background (thanks Debian)
 Patch79:	chromium-93.0.4577.63-widevine-no-download.patch
+
 # Fix crashes with components/cast_*
 # Thanks to Gentoo
-Patch80:	chromium-96.0.4664.45-EnumTable-crash.patch
+Patch80:	chromium-96-EnumTable-crash.patch
 
 # Clean up clang-format for python3
 # thanks to Jon Nettleton
-Patch86:	chromium-93.0.4577.63-clang-format.patch
+Patch86:	chromium-94.0.4606.81-clang-format.patch
 # include full UrlResponseHead header
 Patch95:	chromium-93.0.4577.63-mojo-header-fix.patch
 # Fix multiple defines issue in webrtc/BUILD.gn
@@ -216,13 +221,6 @@ Patch300:	chromium-92.0.4515.107-rhel8-force-disable-use_gnome_keyring.patch
 # Fixes from Gentoo
 Patch400:   chromium-glibc-2.34.patch
 Patch401:   chromium-VirtualCursor-standard-layout.patch
-
-Patch405:   chromium-base-include-memory.patch
-Patch407:   chromium-96-DrmRenderNodePathFinder-include.patch
-Patch408:   chromium-commerce-coupons-coupon_db-vector.patch
-
-# Thanks void linux
-Patch406:   chromium-96-RestrictedCookieManager-tuple.patch
 
 # Clang 12 cflags
 Patch403:   chromium-clang-12-cflags.patch
@@ -274,7 +272,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source22:       ungoogled-chromium.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 96.0.4664.45-1
+%global ungoogled_chromium_revision 96.0.4664.93-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 BuildRequires:	llvm
@@ -572,7 +570,11 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %if 0%{?fedora}
 %patch52 -p1 -b .unbundle-zlib
 %endif
-%patch64 -p1 -b .java-only-allowed
+%patch59 -p1 -b .CouponDB-include
+%patch61 -p1 -b .CommandLine-include
+%patch62 -p1 -b .RestrictedCookieManager-tuple
+%patch63 -p1 -b .DrmRenderNodePathFinder-include
+%patch65 -p1 -b .java-only-allowed
 # %%patch68 -p1 -b .aarch64-clearkeycdm-binutils-workaround
 %if 0%{?fedora} >= 35
 %patch76 -p1 -b .sigstkszfix
@@ -599,10 +601,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 # glibc fix
 %patch400 -p1 -b .glibc-2.34
 %patch401 -p1 -b .virtualcursor
-%patch405 -p1 -b .base-include-memory
-%patch406 -p1 -b .restrictedcookiemanager-tuple
-%patch407 -p1 -b .drmrendernodepathfinder
-%patch408 -p1 -b .commerce-coupons-coupon_db-vector
 
 # cflags
 %if 0%{?fedora} < 35
@@ -1332,6 +1330,9 @@ fi
 %{chromium_path}/chromedriver
 
 %changelog
+* Sat Dec  11 2021 wchen342 <feiyu2817@gmail.com> - 96.0.4664.93-1
+- update Chromium to 96.0.4664.93
+
 * Thu Nov  18 2021 wchen342 <feiyu2817@gmail.com> - 96.0.4664.45-1
 - update Chromium to 96.0.4664.45
 

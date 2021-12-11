@@ -1,16 +1,16 @@
-diff -up chromium-93.0.4577.63/buildtools/linux64/clang-format.clang-format-py3 chromium-93.0.4577.63/buildtools/linux64/clang-format
---- chromium-93.0.4577.63/buildtools/linux64/clang-format.clang-format-py3	2021-09-03 04:42:46.736294345 +0000
-+++ chromium-93.0.4577.63/buildtools/linux64/clang-format	2021-09-03 04:59:55.296512600 +0000
+diff -up chromium-94.0.4606.81/buildtools/linux64/clang-format.clang-format-py3 chromium-94.0.4606.81/buildtools/linux64/clang-format
+--- chromium-94.0.4606.81/buildtools/linux64/clang-format.clang-format-py3	2021-10-08 11:26:16.411861005 -0400
++++ chromium-94.0.4606.81/buildtools/linux64/clang-format	2021-10-08 11:32:16.005895508 -0400
 @@ -12,9 +12,9 @@ def main():
    args = sys.argv[1:]
    inputfiles = [a for a in args if not a.startswith('-')]
-
+ 
 -  contents = ''
 +  contents = b''
    if '-' in args or not inputfiles:
 -    contents = sys.stdin.read()
 +    contents = sys.stdin.buffer.read()
-
+ 
    # Tarball builds may or may not have depot_tools in $PATH. In the former case,
    # running 'clang-format' will call back into this script infinitely. Strip off
 @@ -37,17 +37,17 @@ def main():
@@ -25,13 +25,13 @@ diff -up chromium-93.0.4577.63/buildtools/linux64/clang-format.clang-format-py3 
    except OSError:
      # Ignore if clang-format is not installed.
      pass
-
+ 
    # If any failure happens, continue with unformatted files.
 -  sys.stdout.write(contents)
 +  sys.stdout.buffer.write(contents)
    for inputfile in inputfiles:
 -    sys.stdout.write(open(inputfile).read())
 +    sys.stdout.buffer.write(open(inputfile).read())
-
+ 
    return 0
-
+ 
