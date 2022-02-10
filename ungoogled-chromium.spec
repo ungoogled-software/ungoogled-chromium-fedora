@@ -138,18 +138,18 @@ BuildRequires:  libicu-devel >= 5.4
 #Build with debugging symbols
 %global debug_pkg 0
 
-%global majorversion 96
+%global majorversion 98
 %global revision 1
 
 # Depot tools revision
-%global depot_tools_revision dc86a4b9044f9243886ca0da0c1753820ac51f45
+%global depot_tools_revision a8c66d0dabec812f47b6f2a4639baca46b9b4d7a
 
 %if %{freeworld}
 Name:		ungoogled-chromium%{nsuffix}
 %else
 Name:		ungoogled-chromium
 %endif
-Version:	%{majorversion}.0.4664.110
+Version:	%{majorversion}.0.4758.80
 Release:	1%{?dist}.%{revision}
 %if %{?freeworld}
 # chromium-freeworld
@@ -175,20 +175,10 @@ Patch10:	chromium-92.0.4515.107-widevine-other-locations.patch
 Patch11:        chromium-93.0.4577.63-py3-bootstrap.patch
 # https://gitweb.gentoo.org/repo/gentoo.git/tree/www-client/chromium/files/chromium-unbundle-zlib.patch
 Patch52:	chromium-81.0.4044.92-unbundle-zlib.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-96-CouponDB-include.patch
-Patch59:	chromium-96-CouponDB-include.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-96-CommandLine-include.patch
-Patch61:	chromium-96-CommandLine-include.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-96-RestrictedCookieManager-tuple.patch
-Patch62:	chromium-96-RestrictedCookieManager-tuple.patch
-# https://github.com/stha09/chromium-patches/blob/master/chromium-96-DrmRenderNodePathFinder-include.patch
-Patch63:	chromium-96-DrmRenderNodePathFinder-include.patch
 # Fix issue where closure_compiler thinks java is only allowed in android builds
 # https://bugs.chromium.org/p/chromium/issues/detail?id=1192875
 Patch65:	chromium-91.0.4472.77-java-only-allowed-in-android-builds.patch
 
-# Work around binutils bug in aarch64 (F33+)
-Patch68:	chromium-84.0.4147.125-aarch64-clearkeycdm-binutils-workaround.patch
 # Rawhide (f35) glibc defines SIGSTKSZ as a long instead of a constant
 Patch76:	chromium-92.0.4515.107-rawhide-gcc-std-max-fix.patch
 # Do not download proprietary widevine module in the background (thanks Debian)
@@ -196,22 +186,23 @@ Patch79:	chromium-93.0.4577.63-widevine-no-download.patch
 
 # Fix crashes with components/cast_*
 # Thanks to Gentoo
-Patch80:	chromium-96-EnumTable-crash.patch
+Patch80:	chromium-98.0.4758.80-EnumTable-crash.patch
 
 # Clean up clang-format for python3
 # thanks to Jon Nettleton
 Patch86:	chromium-94.0.4606.81-clang-format.patch
 # include full UrlResponseHead header
 Patch95:	chromium-93.0.4577.63-mojo-header-fix.patch
-# Fix multiple defines issue in webrtc/BUILD.gn
-Patch96:	chromium-94.0.4606.54-webrtc-BUILD.gn-fix-multiple-defines.patch
 # From gentoo
 Patch98:	chromium-94.0.4606.71-InkDropHost-crash.patch
+# Enable WebRTCPPipeWireCapturer by default
+Patch99:	chromium-96.0.4664.110-enable-WebRTCPipeWireCapturer-byDefault.patch
+
 
 
 # VAAPI
 # Upstream turned VAAPI on in Linux in 86
-Patch202:	chromium-89.0.4389.72-enable-hardware-accelerated-mjpeg.patch
+Patch202:	chromium-98.0.4758.80-enable-hardware-accelerated-mjpeg.patch
 Patch203:	chromium-86.0.4240.75-vaapi-i686-fpermissive.patch
 Patch205:	chromium-86.0.4240.75-fix-vaapi-on-intel.patch
 
@@ -272,7 +263,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source22:       ungoogled-chromium.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 96.0.4664.110-1
+%global ungoogled_chromium_revision 98.0.4758.80-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 BuildRequires:	llvm
@@ -570,12 +561,7 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %if 0%{?fedora}
 %patch52 -p1 -b .unbundle-zlib
 %endif
-%patch59 -p1 -b .CouponDB-include
-%patch61 -p1 -b .CommandLine-include
-%patch62 -p1 -b .RestrictedCookieManager-tuple
-%patch63 -p1 -b .DrmRenderNodePathFinder-include
 %patch65 -p1 -b .java-only-allowed
-# %%patch68 -p1 -b .aarch64-clearkeycdm-binutils-workaround
 %if 0%{?fedora} >= 35
 %patch76 -p1 -b .sigstkszfix
 %endif
@@ -585,6 +571,7 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch95 -p1 -b .mojo-header-fix
 %patch96 -p1 -b .webrtc-BUILD.gn-fix-multiple-defines
 %patch98 -p1 -b .InkDropHost-crash
+%patch99 -p1 -b .enable-WebRTCPipeWireCapturer-byDefault
 
 # Feature specific patches
 %if %{use_vaapi}
@@ -766,7 +753,9 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/catapult/common/py_vulcanize/third_party/rcssmin' \
 	'third_party/catapult/common/py_vulcanize/third_party/rjsmin' \
 	'third_party/catapult/third_party/beautifulsoup4' \
+	'third_party/catapult/third_party/beautifulsoup4-4.9.3' \
 	'third_party/catapult/third_party/google-endpoints' \
+	'third_party/catapult/third_party/html5lib-1.1' \
 	'third_party/catapult/third_party/html5lib-python' \
 	'third_party/catapult/third_party/polymer' \
 	'third_party/catapult/third_party/six' \
@@ -932,6 +921,7 @@ build/linux/unbundle/remove_bundled_libraries.py \
 	'third_party/shell-encryption' \
 	'third_party/simplejson' \
 	'third_party/sinonjs' \
+	'third_party/six' \
 	'third_party/skia' \
 	'third_party/skia/include/third_party/skcms' \
 	'third_party/skia/include/third_party/vulkan' \
@@ -1125,6 +1115,9 @@ echo
 %endif
 %build_target %{builddir} policy_templates
 
+# bug #827861, vk_swiftshader_icd.json not getting properly installed in out/Release
+sed -e 's|${ICD_LIBRARY_PATH}|./libvk_swiftshader.so|g' third_party/swiftshader/src/Vulkan/vk_swiftshader_icd.json.tmpl > out/Release/vk_swiftshader_icd.json
+
 %install
 rm -rf %{buildroot}
 
@@ -1152,6 +1145,9 @@ pushd %{builddir}
     cp -a *.pak locales resources icudtl.dat %{buildroot}%{chromium_path}
     %ifarch x86_64 i686 aarch64
         cp -a swiftshader %{buildroot}%{chromium_path}
+			cp -a libvk_swiftshader.so* %{buildroot}%{chromium_path}
+			cp -a libvulkan.so* %{buildroot}%{chromium_path}
+			cp -a vk_swiftshader_icd.json %{buildroot}%{chromium_path}
     %endif
     cp -a chrome %{buildroot}%{chromium_path}/%{chromium_browser_channel}
     cp -a chrome_sandbox %{buildroot}%{chromium_path}/chrome-sandbox
@@ -1264,6 +1260,12 @@ fi
 %{chromium_path}/libclearkeycdm.so
 %endif
 %{chromium_path}/resources/
+%ifarch x86_64 i686 aarch64
+%{chromium_path}/swiftshader/
+%{chromium_path}/libvk_swiftshader.so*
+%{chromium_path}/libvulkan.so*
+%{chromium_path}/vk_swiftshader_icd.json
+%endif
 %dir %{chromium_path}/locales/
 %lang(am) %{chromium_path}/locales/am.pak*
 %lang(ar) %{chromium_path}/locales/ar.pak*
