@@ -569,7 +569,6 @@ ln -s depot_tools-%{depot_tools_revision} ../depot_tools
 %patch80 -p1 -b .EnumTable-crash
 %patch86 -p1 -b .clang-format-py3
 %patch95 -p1 -b .mojo-header-fix
-%patch96 -p1 -b .webrtc-BUILD.gn-fix-multiple-defines
 %patch98 -p1 -b .InkDropHost-crash
 %patch99 -p1 -b .enable-WebRTCPipeWireCapturer-byDefault
 
@@ -697,7 +696,7 @@ UNGOOGLED_CHROMIUM_GN_DEFINES+=' rtc_use_pipewire=true rtc_link_pipewire=true'
 %if %{ccache}
 UNGOOGLED_CHROMIUM_GN_DEFINES+=' cc_wrapper="ccache"'
 %endif
-UNGOOGLED_CHROMIUM_GN_DEFINES+=' chrome_pgo_phase=2 enable_js_type_check=false enable_mse_mpeg2ts_stream_parser=true enable_nacl_nonsfi=false enable_one_click_signin=false enable_reading_list=false enable_remoting=false enable_reporting=false enable_service_discovery=false safe_browsing_mode=0'
+UNGOOGLED_CHROMIUM_GN_DEFINES+=' chrome_pgo_phase=2 enable_js_type_check=false enable_mse_mpeg2ts_stream_parser=true enable_one_click_signin=false enable_reading_list=false enable_remoting=false enable_reporting=false enable_service_discovery=false safe_browsing_mode=0'
 export UNGOOGLED_CHROMIUM_GN_DEFINES
 
 # ungoogled-chromium: binary pruning.
@@ -1334,6 +1333,9 @@ fi
 %{chromium_path}/chromedriver
 
 %changelog
+* Sun Feb  13 2022 wchen342 <feiyu2817@gmail.com> - 98.0.4758.80-1
+- update Chromium to 98.0.4758.80
+
 * Tue Dec  14 2021 wchen342 <feiyu2817@gmail.com> - 96.0.4664.110-1
 - update Chromium to 96.0.4664.110
 - Enable PGO
