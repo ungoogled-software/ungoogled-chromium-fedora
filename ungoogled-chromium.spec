@@ -263,7 +263,7 @@ Source20:	https://www.x.org/releases/individual/proto/xcb-proto-1.14.tar.xz
 Source22:       ungoogled-chromium.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 98.0.4758.80-1
+%global ungoogled_chromium_revision 100.0.4896.75-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 BuildRequires:	llvm
