@@ -1,0 +1,21 @@
+author	Yaowei Zhou <yaowei.zhou@intel.com>	Thu Feb 02 06:18:34 2023
+committer	Yaowei Zhou <yaowei.zhou@intel.com>	Thu Feb 02 06:18:34 2023
+tree	62a79c7f155fc32140d3aa4c4a6b01b8d7eddfcc
+parent	98e427b87ff8447180a60f20ee3792dcbd649481 [diff]
+Enable VA-API flag on ozone wayland
+
+Bug: POC
+Change-Id: I09f696bfe3be82930161ce005152d1397b93f636
+diff --git a/ui/ozone/platform/wayland/ozone_platform_wayland.cc b/ui/ozone/platform/wayland/ozone_platform_wayland.cc
+index b3190c6b..4a2c3bb 100644
+--- a/ui/ozone/platform/wayland/ozone_platform_wayland.cc
++++ b/ui/ozone/platform/wayland/ozone_platform_wayland.cc
+@@ -309,6 +309,8 @@
+       properties->supports_global_screen_coordinates =
+           features::IsWaylandScreenCoordinatesEnabled();
+ 
++      properties->supports_vaapi_x11 = true;
++
+       initialised = true;
+     }
+ 

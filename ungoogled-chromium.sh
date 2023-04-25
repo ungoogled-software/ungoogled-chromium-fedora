@@ -39,8 +39,10 @@ export CHROME_VERSION_EXTRA="Built from source for @@BUILD_TARGET@@"
 # We don't want bug-buddy intercepting our crashes. http://crbug.com/24120
 export GNOME_DISABLE_CRASH_DIALOG=SET_BY_GOOGLE_CHROME
 
-# Disable allow_rgb_configs to fix odd color and vaapi issues with Mesa
-export allow_rgb10_configs=false
+# Allow users to override command-line options and prefer user defined
+# CHROMIUM_USER_FLAGS from env over system wide CHROMIUM_FLAGS
+[[ -f /etc/ungoogled-chromium/ungoogled-chromium.conf ]] && . /etc/ungoogled-chromium/ungoogled-chromium.conf
+CHROMIUM_FLAGS=${CHROMIUM_USER_FLAGS:-$CHROMIUM_FLAGS}
 
 CHROMIUM_DISTRO_FLAGS=" --enable-plugins \
                         --enable-extensions \
@@ -53,20 +55,10 @@ CHROMIUM_DISTRO_FLAGS=" --enable-plugins \
                         --disallow-signin \
                         --auto-ssl-client-auth @@EXTRA_FLAGS@@"
 
-# Load user flags
-if [ -n "$XDG_CONFIG_HOME" ]; then
-    USER_FLAGS_LOCATION="$XDG_CONFIG_HOME/chromium-flags.conf"
-elif [ -n "$HOME" ]; then
-    USER_FLAGS_LOCATION="$HOME/.config/chromium-flags.conf"
-fi
-if [ -f $USER_FLAGS_LOCATION ]; then
-    while read -r line; do
-    case "$line" in
-        --*)
-            CHROMIUM_DISTRO_FLAGS+="$line "
-        ;;
-    esac
-    done < "$USER_FLAGS_LOCATION"
-fi
+# Sanitize std{in,out,err} because they'll be shared with untrusted child
+# processes (http://crbug.com/376567).
+exec < /dev/null
+exec > >(exec cat)
+exec 2> >(exec cat >&2)
 
-exec -a "$0" "$HERE/@@CHROMIUM_BROWSER_CHANNEL@@" $CHROMIUM_DISTRO_FLAGS "$@"
+exec -a "$0" "$HERE/@@CHROMIUM_BROWSER_CHANNEL@@" $CHROMIUM_FLAGS $CHROMIUM_DISTRO_FLAGS "$@"

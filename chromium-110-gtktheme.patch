@@ -1,0 +1,79 @@
+Update web_instance on GTK when checking for dark mode
+
+Adds some extra code to change the theme in the web instance when on GTK,
+to fix prefers-color-scheme.
+
+Also makes SystemDarkModeSupported return true on Linux,
+since the most modern Linux distributions support it,
+and Linux dark mode code doesn’t detect whether or not it is supported.
+This function seems to only be used in telemetry, so maybe it doesn’t
+need to be changed.
+
+Bug: 998903
+Change-Id: I02a084d9f733b01c8e6ad0f5ca5f1ebcfb16d475
+diff --git a/AUTHORS b/AUTHORS
+index 758d0bf..8c91146 100644
+--- a/AUTHORS
++++ b/AUTHORS
+@@ -735,6 +735,7 @@
+ Leith Bade <leith@leithalweapon.geek.nz>
+ Lei Gao <leigao@huawei.com>
+ Lei Li <lli.kernel.kvm@gmail.com>
++Lena Wildervanck <lena.wildervanck@gmail.com>
+ Lenny Khazan <lenny.khazan@gmail.com>
+ Leo Wolf <jclw@ymail.com>
+ Leon Han <leon.han@intel.com>
+diff --git a/chrome/common/chrome_features.cc b/chrome/common/chrome_features.cc
+index 85c3931..2b0c2a84 100644
+--- a/chrome/common/chrome_features.cc
++++ b/chrome/common/chrome_features.cc
+@@ -1430,12 +1430,12 @@
+ BASE_FEATURE(kWebUIDarkMode,
+              "WebUIDarkMode",
+ #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID) || \
+-    BUILDFLAG(IS_CHROMEOS)
++    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX)
+              base::FEATURE_ENABLED_BY_DEFAULT
+ #else
+              base::FEATURE_DISABLED_BY_DEFAULT
+ #endif  // BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID) ||
+-        // BUILDFLAG(IS_CHROMEOS)
++        // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX)
+ );
+ 
+ #if BUILDFLAG(IS_CHROMEOS_ASH)
+diff --git a/ui/gtk/native_theme_gtk.cc b/ui/gtk/native_theme_gtk.cc
+index a60d6e3..1200a80 100644
+--- a/ui/gtk/native_theme_gtk.cc
++++ b/ui/gtk/native_theme_gtk.cc
+@@ -165,6 +165,14 @@
+       UserHasContrastPreference()
+           ? ui::NativeThemeBase::PreferredContrast::kMore
+           : ui::NativeThemeBase::PreferredContrast::kNoPreference);
++
++  // Update the web instance too to fix prefers-color-theme
++  NativeTheme* web_instance = NativeTheme::GetInstanceForWeb();
++  web_instance->set_use_dark_colors(ShouldUseDarkColors());
++  web_instance->set_preferred_color_scheme(CalculatePreferredColorScheme());
++  web_instance->SetPreferredContrast(CalculatePreferredContrast());
++  web_instance->NotifyOnNativeThemeUpdated();
++
+   native_theme->NotifyOnNativeThemeUpdated();
+ }
+ 
+diff --git a/ui/native_theme/native_theme.cc b/ui/native_theme/native_theme.cc
+index 835fa36..feec109 100644
+--- a/ui/native_theme/native_theme.cc
++++ b/ui/native_theme/native_theme.cc
+@@ -36,7 +36,11 @@
+ #if !BUILDFLAG(IS_WIN) && !BUILDFLAG(IS_APPLE)
+ // static
+ bool NativeTheme::SystemDarkModeSupported() {
++#if BUILDFLAG(IS_LINUX)
++  return true;
++#else
+   return false;
++#endif
+ }
+ #endif
+ 
