@@ -56,10 +56,12 @@ fi
 generated_files_headers="$generated_files_headers ${generated_files//.asm/.h}"
 
 header_files="	libavcodec/x86/inline_asm.h \
+		libavcodec/x86/hpeldsp.h \
 		libavcodec/x86/mathops.h \
-		libavcodec/x86/vp56_arith.h \
+		libavcodec/x86/vpx_arith.h \
 		libavcodec/aarch64/vp8dsp.h \
 		libavcodec/arm/vp8dsp.h \
+		libavcodec/arm/vpx_arith.h \
 		libavcodec/aac.h \
 		libavcodec/aacps.h \
 		libavcodec/aacpsdsp.h \
@@ -67,6 +69,7 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavcodec/aac_ac3_parser.h \
 		libavcodec/aac_defines.h \
 		libavcodec/ac3.h \
+		libavcodec/ac3defs.h \
 		libavcodec/ac3tab.h \
 		libavcodec/adts_header.h \
 		libavcodec/avcodec.h \
@@ -76,10 +79,12 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavcodec/cbrt_tablegen.h \
 		libavcodec/codec.h \
 		libavcodec/codec_id.h \
+		libavcodec/codec_internal.h \
 		libavcodec/codec_par.h \
 		libavcodec/dct.h \
 		libavcodec/dct32.h \
 		libavcodec/defs.h \
+		libavcodec/dv.h \
 		libavcodec/error_resilience.h \
 		libavcodec/fdctdsp.h \
 		libavcodec/fft.h \
@@ -87,10 +92,12 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavcodec/fft_table.h \
 		libavcodec/flac.h \
 		libavcodec/flacdsp.h \
+		libavcodec/flac_parse.h \
 		libavcodec/frame_thread_encoder.h \
 		libavcodec/get_bits.h \
 		libavcodec/h263dsp.h \
 		libavcodec/h264chroma.h \
+		libavcodec/hevc.h \
 		libavcodec/hpeldsp.h \
 		libavcodec/hwaccels.h \
 		libavcodec/hwconfig.h \
@@ -98,8 +105,6 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavcodec/internal.h \
 		libavcodec/kbdwin.h \
 		libavcodec/mathops.h \
-		libavcodec/mdct15.c \
-		libavcodec/mdct15.h \
 		libavcodec/me_cmp.h \
 		libavcodec/mlp_parse.h \
 		libavcodec/motion_est.h \
@@ -115,9 +120,9 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavcodec/mpegutils.h \
 		libavcodec/mpegvideo.h \
 		libavcodec/mpegvideodata.h \
-		libavcodec/mpegvideodsp.h \
 		libavcodec/mpegvideoencdsp.h \
 		libavcodec/options_table.h \
+		libavcodec/opus.h \
 		libavcodec/opusdsp.h \
 		libavcodec/opus_celt.h \
 		libavcodec/opus_pvq.h \
@@ -139,9 +144,12 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavcodec/sbrdsp.h \
 		libavcodec/sinewin.h \
 		libavcodec/sinewin_tablegen.h \
+		libavcodec/startcode.h \
 		libavcodec/thread.h \
+		libavcodec/threadframe.h \
 		libavcodec/unary.h \
 		libavcodec/version.h \
+		libavcodec/version_major.h \
 		libavcodec/videodsp.h \
 		libavcodec/vlc.h \
 		libavcodec/vorbisdsp.h \
@@ -152,6 +160,7 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavcodec/vp56dsp.h \
 		libavcodec/vp8data.h \
 		libavcodec/vp8dsp.h \
+		libavcodec/vp89_rac.h \
 		libavformat/apetag.h \
 		libavformat/avformat.h \
 		libavformat/dv.h \
@@ -166,6 +175,7 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavformat/srtp.h \
 		libavformat/options_table.h \
 		libavformat/version.h \
+		libavformat/version_major.h \
 		libavformat/w64.h \
 		libavutil/aarch64/cpu.h \
 		libavutil/x86/asm.h \
@@ -176,6 +186,7 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavutil/x86/intmath.h
 		libavutil/x86/timer.h \
 		libavutil/attributes.h \
+		libavutil/attributes_internal.h \
 		libavutil/audio_fifo.h \
 		libavutil/avassert.h \
 		libavutil/avutil.h \
@@ -208,6 +219,7 @@ header_files="	libavcodec/x86/inline_asm.h \
 		libavutil/version.h \
 		libswresample/swresample.h \
 		libswresample/version.h \
+		libswresample/version_major.h \
 		compat/va_copy.h \
 		compat/atomics/gcc/stdatomic.h "
 
@@ -217,15 +229,16 @@ manual_files="	libavcodec/aarch64/fft_neon.S \
 		libavcodec/aarch64/mdct_neon.S \
 		libavcodec/aarch64/neon.S \
 		libavcodec/aarch64/vorbisdsp_neon.S \
+		libavcodec/aarch64/vorbisdsp_init.c \
 		libavcodec/aarch64/vp8dsp_neon.S \
+		libavcodec/x86/hpeldsp.asm \
 		libavcodec/x86/hpeldsp_rnd_template.c \
-		libavcodec/x86/mdct15.asm \
-		libavcodec/x86/mdct15_init.c \
 		libavcodec/x86/rnd_template.c \
 		libavcodec/x86/videodsp.asm \
 		libavcodec/x86/videodsp_init.c \
 		libavcodec/x86/vorbisdsp_init.c \
-		libavcodec/autorename_libavcodec_mdct15.c \
+		libavcodec/x86/vp3dsp.asm \
+		libavcodec/x86/vp8dsp.asm \
 		libavcodec/bit_depth_template.c \
 		libavcodec/fft_template.c \
 		libavcodec/flacdec.c \
@@ -235,7 +248,6 @@ manual_files="	libavcodec/aarch64/fft_neon.S \
 		libavcodec/h264pred_template.c \
 		libavcodec/hpel_template.c \
 		libavcodec/hpeldsp.c \
-		libavcodec/mdct15.c \
 		libavcodec/mdct_template.c \
 		libavcodec/options.c \
 		libavcodec/pcm.c \
@@ -246,12 +258,15 @@ manual_files="	libavcodec/aarch64/fft_neon.S \
 		libavcodec/vorbisdsp.c \
 		libavcodec/vp3dsp.c \
 		libavcodec/vp8dsp.c \
+		libavformat/flacdec.c \
 		libavformat/options.c \
 		libavformat/pcm.c \
 		libavformat/utils.c \
+		libavformat/version.c \
 		libavutil/aarch64/asm.S \
 		libavutil/aarch64/bswap.h \
 		libavutil/aarch64/cpu.c \
+		libavutil/aarch64/float_dsp_init.c \
 		libavutil/aarch64/float_dsp_neon.S \
 		libavutil/aarch64/timer.h \
 		libavutil/cpu.c \
@@ -261,8 +276,10 @@ manual_files="	libavcodec/aarch64/fft_neon.S \
 		libavutil/tx_float.c \
 		libavutil/tx_template.c \
 		libavutil/utils.c \
+		libavutil/version.c \
 		libavutil/x86/cpu.c \
 		libavutil/x86/float_dsp_init.c \
+		libavutil/x86/tx_float_init.c \
 		libavutil/x86/x86inc.asm \
 		libavutil/x86/x86util.asm "
 

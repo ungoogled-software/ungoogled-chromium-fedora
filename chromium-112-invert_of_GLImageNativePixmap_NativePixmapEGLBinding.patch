@@ -1,0 +1,630 @@
+commit 7f0858c08dcef70ca26ce8527bbedfcc5c5218d3
+Author: Colin Blundell <blundell@chromium.org>
+Date:   Thu Feb 23 14:19:33 2023 +0000
+
+    [Ozone] Invert layering of GLImageNativePixmap & NativePixmapEGLBinding
+    
+    NativePixmapEGLBinding is currently a thin layer on top of
+    GLImageNativePixmap. This CL inverts the layering so that
+    GLImageNativePixmap instead sits on top of NativePixmapEGLBinding
+    (via the public Ozone ImportNativePixmap() method, for which all
+    implementations return NativePixmapEGLBinding). Note that this entails
+    moving GLImageNativePixmap into //gpu, as //ui/gl cannot depend on
+    //ozone/public.
+    
+    This inversion means that
+    (a) the SharedImage Ozone backing/representations no longer use GLImage
+    (b) when we no longer need GLImageNativePixmap we can simply directly
+    eliminate it.
+    
+    Followup CLs will fold NativePixmapEGLBindingHelper into
+    NativePixmapEGLBinding and make GLImageNativePixmap creation private
+    with friending to ensure that no more usage of the deprecated class
+    creeps in.
+    
+    Bug: 1412692
+    Change-Id: I5f01e9b1f616dd99b61cd203662d0d02d3da7b3e
+    Reviewed-on: https://chromium-review.googlesource.com/c/chromium/src/+/4262390
+    Reviewed-by: Vasiliy Telezhnikov <vasilyt@chromium.org>
+    Reviewed-by: ccameron chromium <ccameron@chromium.org>
+    Reviewed-by: Andres Calderon Jaramillo <andrescj@chromium.org>
+    Commit-Queue: Colin Blundell <blundell@chromium.org>
+    Cr-Commit-Position: refs/heads/main@{#1108909}
+
+diff --git a/gpu/command_buffer/service/BUILD.gn b/gpu/command_buffer/service/BUILD.gn
+index d08be597e3e5d..5ad724dd57bbb 100644
+--- a/gpu/command_buffer/service/BUILD.gn
++++ b/gpu/command_buffer/service/BUILD.gn
+@@ -397,6 +397,8 @@ target(link_target_type, "gles2_sources") {
+ 
+   if (use_ozone) {
+     sources += [
++      "shared_image/gl_image_native_pixmap.cc",
++      "shared_image/gl_image_native_pixmap.h",
+       "shared_image/gl_ozone_image_representation.cc",
+       "shared_image/gl_ozone_image_representation.h",
+       "shared_image/ozone_image_backing.cc",
+diff --git a/gpu/command_buffer/service/gles2_cmd_decoder.cc b/gpu/command_buffer/service/gles2_cmd_decoder.cc
+index e3f5b3c5721cf..a297347c19670 100644
+--- a/gpu/command_buffer/service/gles2_cmd_decoder.cc
++++ b/gpu/command_buffer/service/gles2_cmd_decoder.cc
+@@ -120,10 +120,10 @@
+ #endif
+ 
+ #if BUILDFLAG(IS_OZONE)
++#include "gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h"
+ #include "ui/gfx/buffer_format_util.h"
+ #include "ui/gfx/buffer_usage_util.h"
+ #include "ui/gfx/native_pixmap.h"
+-#include "ui/gl/gl_image_native_pixmap.h"
+ #include "ui/ozone/public/ozone_platform.h"
+ #include "ui/ozone/public/surface_factory_ozone.h"
+ #endif
+@@ -499,7 +499,7 @@ class BackTexture {
+ #if BUILDFLAG(IS_OZONE)
+   // The image that backs the texture, if its backed by a native
+   // GpuMemoryBuffer.
+-  scoped_refptr<gl::GLImageNativePixmap> image_;
++  scoped_refptr<GLImageNativePixmap> image_;
+ #endif
+ };
+ 
+@@ -2522,7 +2522,7 @@ class GLES2DecoderImpl : public GLES2Decoder,
+   // Note: Creation of anonymous images is possible only on Ozone.
+ #if BUILDFLAG(IS_OZONE)
+   bool SupportsCreateAnonymousImage();
+-  scoped_refptr<gl::GLImageNativePixmap> CreateAnonymousImage(
++  scoped_refptr<GLImageNativePixmap> CreateAnonymousImage(
+       const gfx::Size& size,
+       gfx::BufferFormat format,
+       bool* is_cleared,
+@@ -3242,7 +3242,7 @@ bool BackTexture::AllocateNativeGpuMemoryBuffer(const gfx::Size& size,
+     // duplicate BGRX_8888.
+     buffer_format = gfx::BufferFormat::BGRX_8888;
+   }
+-  scoped_refptr<gl::GLImageNativePixmap> image = decoder_->CreateAnonymousImage(
++  scoped_refptr<GLImageNativePixmap> image = decoder_->CreateAnonymousImage(
+       size, buffer_format, &is_cleared, Target(), id());
+   if (!image)
+     return false;
+@@ -19592,7 +19592,7 @@ bool GLES2DecoderImpl::SupportsCreateAnonymousImage() {
+       .supports_native_pixmaps;
+ }
+ 
+-scoped_refptr<gl::GLImageNativePixmap> GLES2DecoderImpl::CreateAnonymousImage(
++scoped_refptr<GLImageNativePixmap> GLES2DecoderImpl::CreateAnonymousImage(
+     const gfx::Size& size,
+     gfx::BufferFormat format,
+     bool* is_cleared,
+@@ -19612,8 +19612,8 @@ scoped_refptr<gl::GLImageNativePixmap> GLES2DecoderImpl::CreateAnonymousImage(
+                << gfx::BufferUsageToString(usage);
+     return nullptr;
+   }
+-  auto image = gl::GLImageNativePixmap::Create(size, format, std::move(pixmap),
+-                                               target, texture_id);
++  auto image = GLImageNativePixmap::Create(size, format, std::move(pixmap),
++                                           target, texture_id);
+   if (!image) {
+     LOG(ERROR) << "Failed to create GLImage " << size.ToString() << ", "
+                << gfx::BufferFormatToString(format) << ", usage "
+diff --git a/ui/gl/gl_image_native_pixmap.cc b/gpu/command_buffer/service/shared_image/gl_image_native_pixmap.cc
+similarity index 73%
+rename from ui/gl/gl_image_native_pixmap.cc
+rename to gpu/command_buffer/service/shared_image/gl_image_native_pixmap.cc
+index 6cbe7be2899de..d9101fbda893b 100644
+--- a/ui/gl/gl_image_native_pixmap.cc
++++ b/gpu/command_buffer/service/shared_image/gl_image_native_pixmap.cc
+@@ -2,9 +2,13 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
+-#include "ui/gl/gl_image_native_pixmap.h"
++#include "gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h"
+ 
+-namespace gl {
++#include "ui/ozone/public/native_pixmap_gl_binding.h"
++#include "ui/ozone/public/ozone_platform.h"
++#include "ui/ozone/public/surface_factory_ozone.h"
++
++namespace gpu {
+ 
+ scoped_refptr<GLImageNativePixmap> GLImageNativePixmap::Create(
+     const gfx::Size& size,
+@@ -47,18 +51,18 @@ bool GLImageNativePixmap::InitializeFromNativePixmap(
+     const gfx::ColorSpace& color_space,
+     GLenum target,
+     GLuint texture_id) {
+-  binding_helper_ = NativePixmapEGLBindingHelper::CreateForPlane(
+-      size_, format, plane, std::move(pixmap), color_space, target, texture_id);
++  pixmap_gl_binding_ =
++      ui::OzonePlatform::GetInstance()
++          ->GetSurfaceFactoryOzone()
++          ->GetCurrentGLOzone()
++          ->ImportNativePixmap(std::move(pixmap), format, plane, size_,
++                               color_space, target, texture_id);
+ 
+-  return !!binding_helper_;
++  return !!pixmap_gl_binding_;
+ }
+ 
+ gfx::Size GLImageNativePixmap::GetSize() {
+   return size_;
+ }
+ 
+-unsigned GLImageNativePixmap::GetInternalFormat() {
+-  return binding_helper_->GetInternalFormat();
+-}
+-
+-}  // namespace gl
++}  // namespace gpu
+diff --git a/ui/gl/gl_image_native_pixmap.h b/gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h
+similarity index 72%
+rename from ui/gl/gl_image_native_pixmap.h
+rename to gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h
+index 5ff5e91b3ec18..4087360b04b45 100644
+--- a/ui/gl/gl_image_native_pixmap.h
++++ b/gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h
+@@ -2,21 +2,24 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
+-#ifndef UI_GL_GL_IMAGE_NATIVE_PIXMAP_H_
+-#define UI_GL_GL_IMAGE_NATIVE_PIXMAP_H_
++#ifndef GPU_COMMAND_BUFFER_SERVICE_SHARED_IMAGE_GL_IMAGE_NATIVE_PIXMAP_H_
++#define GPU_COMMAND_BUFFER_SERVICE_SHARED_IMAGE_GL_IMAGE_NATIVE_PIXMAP_H_
+ 
+ #include <stdint.h>
+ 
++#include "gpu/gpu_gles2_export.h"
+ #include "ui/gfx/color_space.h"
+ #include "ui/gfx/native_pixmap.h"
+ #include "ui/gl/gl_bindings.h"
+-#include "ui/gl/gl_export.h"
+ #include "ui/gl/gl_image.h"
+-#include "ui/gl/native_pixmap_egl_binding_helper.h"
+ 
+-namespace gl {
++namespace ui {
++class NativePixmapGLBinding;
++}
+ 
+-class GL_EXPORT GLImageNativePixmap : public GLImage {
++namespace gpu {
++
++class GPU_GLES2_EXPORT GLImageNativePixmap : public gl::GLImage {
+  public:
+   // Create an EGLImage from a given NativePixmap and bind |texture_id| to
+   // |target| following by binding the image to |target|.
+@@ -41,22 +44,15 @@ class GL_EXPORT GLImageNativePixmap : public GLImage {
+       GLenum target,
+       GLuint texture_id);
+ 
+-  // Get the GL internal format of the image.
+-  // It is aligned with glTexImage{2|3}D's parameter |internalformat|.
+-  unsigned GetInternalFormat();
+-
+   // Overridden from GLImage:
+   gfx::Size GetSize() override;
+ 
+- protected:
+-  ~GLImageNativePixmap() override;
+-
+  private:
+   explicit GLImageNativePixmap(const gfx::Size& size);
++  ~GLImageNativePixmap() override;
+ 
+-  // Create an EGLImage from a given NativePixmap and bind |texture_id| to
+-  // |target| followed by binding the image to |target|. This EGLImage can be
+-  // converted to a GL texture.
++  // Create a NativePixmapGLBinding from a given NativePixmap. Returns true iff
++  // the binding was successfully created.
+   bool InitializeFromNativePixmap(gfx::BufferFormat format,
+                                   gfx::BufferPlane plane,
+                                   scoped_refptr<gfx::NativePixmap> pixmap,
+@@ -64,10 +60,10 @@ class GL_EXPORT GLImageNativePixmap : public GLImage {
+                                   GLenum target,
+                                   GLuint texture_id);
+ 
+-  std::unique_ptr<NativePixmapEGLBindingHelper> binding_helper_;
++  std::unique_ptr<ui::NativePixmapGLBinding> pixmap_gl_binding_;
+   const gfx::Size size_;
+ };
+ 
+-}  // namespace gl
++}  // namespace gpu
+ 
+-#endif  // UI_GL_GL_IMAGE_NATIVE_PIXMAP_H_
++#endif  // GPU_COMMAND_BUFFER_SERVICE_SHARED_IMAGE_GL_IMAGE_NATIVE_PIXMAP_H_
+diff --git a/gpu/command_buffer/service/shared_image/gl_ozone_image_representation.h b/gpu/command_buffer/service/shared_image/gl_ozone_image_representation.h
+index 31723894088e1..ade337bde9966 100644
+--- a/gpu/command_buffer/service/shared_image/gl_ozone_image_representation.h
++++ b/gpu/command_buffer/service/shared_image/gl_ozone_image_representation.h
+@@ -14,7 +14,6 @@
+ #include "gpu/command_buffer/service/shared_image/shared_image_representation.h"
+ #include "gpu/command_buffer/service/texture_manager.h"
+ #include "ui/gfx/native_pixmap.h"
+-#include "ui/gl/gl_image_native_pixmap.h"
+ #include "ui/ozone/public/native_pixmap_gl_binding.h"
+ 
+ namespace gpu {
+diff --git a/gpu/command_buffer/service/shared_image/ozone_image_backing.cc b/gpu/command_buffer/service/shared_image/ozone_image_backing.cc
+index 8d4a7d9306eb1..7a652ae425c0e 100644
+--- a/gpu/command_buffer/service/shared_image/ozone_image_backing.cc
++++ b/gpu/command_buffer/service/shared_image/ozone_image_backing.cc
+@@ -36,7 +36,6 @@
+ #include "ui/gfx/native_pixmap.h"
+ #include "ui/gfx/native_widget_types.h"
+ #include "ui/gl/buildflags.h"
+-#include "ui/gl/gl_image_native_pixmap.h"
+ 
+ #if BUILDFLAG(ENABLE_VULKAN)
+ #include "gpu/command_buffer/service/shared_image/skia_vk_ozone_image_representation.h"
+diff --git a/media/gpu/v4l2/BUILD.gn b/media/gpu/v4l2/BUILD.gn
+index 12e6b66cf7b89..ff7b5a1a50a38 100644
+--- a/media/gpu/v4l2/BUILD.gn
++++ b/media/gpu/v4l2/BUILD.gn
+@@ -98,6 +98,7 @@ source_set("v4l2") {
+     ":libv4l2_stubs",
+     ":v4l2_status",
+     "//base",
++    "//gpu/command_buffer/service:gles2",
+     "//gpu/ipc/common",
+     "//gpu/ipc/service",
+     "//media",
+diff --git a/media/gpu/v4l2/generic_v4l2_device.cc b/media/gpu/v4l2/generic_v4l2_device.cc
+index bdbb256ed578c..337ec0e7b372b 100644
+--- a/media/gpu/v4l2/generic_v4l2_device.cc
++++ b/media/gpu/v4l2/generic_v4l2_device.cc
+@@ -23,6 +23,7 @@
+ #include "base/strings/stringprintf.h"
+ #include "base/trace_event/trace_event.h"
+ #include "build/build_config.h"
++#include "gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h"
+ #include "media/base/video_types.h"
+ #include "media/gpu/buildflags.h"
+ #include "media/gpu/chromeos/fourcc.h"
+@@ -32,7 +33,6 @@
+ #include "ui/gfx/native_pixmap_handle.h"
+ #include "ui/gl/egl_util.h"
+ #include "ui/gl/gl_bindings.h"
+-#include "ui/gl/gl_image_native_pixmap.h"
+ #include "ui/ozone/public/ozone_platform.h"
+ #include "ui/ozone/public/surface_factory_ozone.h"
+ 
+@@ -281,7 +281,7 @@ EGLImageKHR GenericV4L2Device::CreateEGLImage(
+   return egl_image;
+ }
+ 
+-scoped_refptr<gl::GLImageNativePixmap> GenericV4L2Device::CreateGLImage(
++scoped_refptr<gpu::GLImageNativePixmap> GenericV4L2Device::CreateGLImage(
+     const gfx::Size& size,
+     const Fourcc fourcc,
+     gfx::NativePixmapHandle handle,
+@@ -317,7 +317,7 @@ scoped_refptr<gl::GLImageNativePixmap> GenericV4L2Device::CreateGLImage(
+   DCHECK(pixmap);
+ 
+   // TODO(b/220336463): plumb the right color space.
+-  auto image = gl::GLImageNativePixmap::Create(
++  auto image = gpu::GLImageNativePixmap::Create(
+       size, buffer_format, std::move(pixmap), target, texture_id);
+   DCHECK(image);
+   return image;
+diff --git a/media/gpu/v4l2/generic_v4l2_device.h b/media/gpu/v4l2/generic_v4l2_device.h
+index bb9ce391c15bd..fd84aee27097e 100644
+--- a/media/gpu/v4l2/generic_v4l2_device.h
++++ b/media/gpu/v4l2/generic_v4l2_device.h
+@@ -55,7 +55,7 @@ class GenericV4L2Device : public V4L2Device {
+                              const Fourcc fourcc,
+                              gfx::NativePixmapHandle handle) const override;
+ 
+-  scoped_refptr<gl::GLImageNativePixmap> CreateGLImage(
++  scoped_refptr<gpu::GLImageNativePixmap> CreateGLImage(
+       const gfx::Size& size,
+       const Fourcc fourcc,
+       gfx::NativePixmapHandle handle,
+diff --git a/media/gpu/v4l2/v4l2_device.h b/media/gpu/v4l2/v4l2_device.h
+index bdc39bf65ae38..ee74cbcd39957 100644
+--- a/media/gpu/v4l2/v4l2_device.h
++++ b/media/gpu/v4l2/v4l2_device.h
+@@ -28,6 +28,7 @@
+ #include "base/files/scoped_file.h"
+ #include "base/memory/ref_counted.h"
+ #include "base/sequence_checker.h"
++#include "gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h"
+ #include "media/base/video_codecs.h"
+ #include "media/base/video_decoder_config.h"
+ #include "media/base/video_frame.h"
+@@ -42,7 +43,6 @@
+ #include "ui/gfx/geometry/size.h"
+ #include "ui/gfx/native_pixmap_handle.h"
+ #include "ui/gl/gl_bindings.h"
+-#include "ui/gl/gl_image_native_pixmap.h"
+ 
+ // TODO(mojahsu): remove this once V4L2 headers are updated.
+ #ifndef V4L2_PIX_FMT_JPEG_RAW
+@@ -777,7 +777,7 @@ class MEDIA_GPU_EXPORT V4L2Device
+ 
+   // Create a GLImageNativePixmap from provided |handle|, taking full ownership
+   // of it.
+-  virtual scoped_refptr<gl::GLImageNativePixmap> CreateGLImage(
++  virtual scoped_refptr<gpu::GLImageNativePixmap> CreateGLImage(
+       const gfx::Size& size,
+       const Fourcc fourcc,
+       gfx::NativePixmapHandle handle,
+diff --git a/media/gpu/v4l2/v4l2_slice_video_decode_accelerator.cc b/media/gpu/v4l2/v4l2_slice_video_decode_accelerator.cc
+index a51acedc105b7..78cc605e986e6 100644
+--- a/media/gpu/v4l2/v4l2_slice_video_decode_accelerator.cc
++++ b/media/gpu/v4l2/v4l2_slice_video_decode_accelerator.cc
+@@ -30,6 +30,7 @@
+ #include "base/time/time.h"
+ #include "base/trace_event/memory_dump_manager.h"
+ #include "base/trace_event/trace_event.h"
++#include "gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h"
+ #include "media/base/bind_to_current_loop.h"
+ #include "media/base/media_switches.h"
+ #include "media/base/scopedfd_helper.h"
+@@ -49,7 +50,6 @@
+ #include "ui/gl/gl_bindings.h"
+ #include "ui/gl/gl_context.h"
+ #include "ui/gl/gl_display.h"
+-#include "ui/gl/gl_image_native_pixmap.h"
+ #include "ui/gl/gl_surface_egl.h"
+ #include "ui/gl/scoped_binders.h"
+ 
+@@ -1444,7 +1444,7 @@ void V4L2SliceVideoDecodeAccelerator::CreateGLImageFor(
+     return;
+   }
+ 
+-  scoped_refptr<gl::GLImageNativePixmap> gl_image =
++  scoped_refptr<gpu::GLImageNativePixmap> gl_image =
+       gl_device->CreateGLImage(visible_size, fourcc, std::move(handle),
+                                gl_device->GetTextureTarget(), texture_id);
+   if (!gl_image) {
+diff --git a/media/gpu/vaapi/BUILD.gn b/media/gpu/vaapi/BUILD.gn
+index 1ecf8854d02e7..7687384553806 100644
+--- a/media/gpu/vaapi/BUILD.gn
++++ b/media/gpu/vaapi/BUILD.gn
+@@ -96,6 +96,7 @@ source_set("vaapi") {
+     ":vaapi_status",
+     "//base",
+     "//build:chromeos_buildflags",
++    "//gpu/command_buffer/service:gles2",
+     "//gpu/config",
+     "//gpu/ipc/common",
+     "//gpu/ipc/service",
+diff --git a/media/gpu/vaapi/vaapi_picture_native_pixmap_ozone.cc b/media/gpu/vaapi/vaapi_picture_native_pixmap_ozone.cc
+index 06617ffec8e5a..626dda6312213 100644
+--- a/media/gpu/vaapi/vaapi_picture_native_pixmap_ozone.cc
++++ b/media/gpu/vaapi/vaapi_picture_native_pixmap_ozone.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "media/gpu/vaapi/vaapi_picture_native_pixmap_ozone.h"
+ 
++#include "gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h"
+ #include "media/base/format_utils.h"
+ #include "media/gpu/buffer_validation.h"
+ #include "media/gpu/chromeos/platform_video_frame_utils.h"
+@@ -15,7 +16,6 @@
+ #include "ui/gfx/linux/native_pixmap_dmabuf.h"
+ #include "ui/gfx/native_pixmap.h"
+ #include "ui/gl/gl_bindings.h"
+-#include "ui/gl/gl_image_native_pixmap.h"
+ #include "ui/gl/scoped_binders.h"
+ #include "ui/ozone/public/ozone_platform.h"
+ #include "ui/ozone/public/surface_factory_ozone.h"
+@@ -87,7 +87,7 @@ VaapiStatus VaapiPictureNativePixmapOzone::Initialize(
+   const gfx::BufferFormat format = pixmap->GetBufferFormat();
+ 
+   // TODO(b/220336463): plumb the right color space.
+-  auto image = gl::GLImageNativePixmap::Create(
++  auto image = gpu::GLImageNativePixmap::Create(
+       visible_size_, format, std::move(pixmap),
+       base::strict_cast<GLenum>(texture_target_),
+       base::strict_cast<GLuint>(texture_id_));
+diff --git a/media/gpu/vaapi/vaapi_picture_native_pixmap_ozone.h b/media/gpu/vaapi/vaapi_picture_native_pixmap_ozone.h
+index 101728f36c1e1..eaced9a8ccadf 100644
+--- a/media/gpu/vaapi/vaapi_picture_native_pixmap_ozone.h
++++ b/media/gpu/vaapi/vaapi_picture_native_pixmap_ozone.h
+@@ -17,7 +17,7 @@ namespace gfx {
+ class NativePixmap;
+ }  // namespace gfx
+ 
+-namespace gl {
++namespace gpu {
+ class GLImageNativePixmap;
+ }
+ 
+@@ -55,7 +55,7 @@ class VaapiPictureNativePixmapOzone : public VaapiPictureNativePixmap {
+   VaapiStatus Initialize(scoped_refptr<gfx::NativePixmap> pixmap);
+ 
+   // GLImage bound to the GL textures used by the VDA client.
+-  scoped_refptr<gl::GLImageNativePixmap> gl_image_;
++  scoped_refptr<gpu::GLImageNativePixmap> gl_image_;
+ };
+ 
+ }  // namespace media
+diff --git a/ui/gfx/linux/native_pixmap_dmabuf.h b/ui/gfx/linux/native_pixmap_dmabuf.h
+index 7f134110417ea..f12d4f5eac89d 100644
+--- a/ui/gfx/linux/native_pixmap_dmabuf.h
++++ b/ui/gfx/linux/native_pixmap_dmabuf.h
+@@ -17,7 +17,7 @@
+ namespace gfx {
+ 
+ // This class converts a gfx::NativePixmapHandle to a gfx::NativePixmap.
+-// It is useful because gl::GLImageNativePixmap::Initialize only takes
++// It is useful because gpu::GLImageNativePixmap::Initialize only takes
+ // a gfx::NativePixmap as input.
+ class GFX_EXPORT NativePixmapDmaBuf : public gfx::NativePixmap {
+  public:
+diff --git a/ui/gl/BUILD.gn b/ui/gl/BUILD.gn
+index cc23c0a8b4c64..2a07859c4dad8 100644
+--- a/ui/gl/BUILD.gn
++++ b/ui/gl/BUILD.gn
+@@ -226,8 +226,6 @@ component("gl") {
+ 
+     if (is_linux || is_chromeos || use_ozone) {
+       sources += [
+-        "gl_image_native_pixmap.cc",
+-        "gl_image_native_pixmap.h",
+         "native_pixmap_egl_binding_helper.cc",
+         "native_pixmap_egl_binding_helper.h",
+       ]
+diff --git a/ui/ozone/common/native_pixmap_egl_binding.cc b/ui/ozone/common/native_pixmap_egl_binding.cc
+index 8dce01a41281e..2e18e73eb6cbb 100644
+--- a/ui/ozone/common/native_pixmap_egl_binding.cc
++++ b/ui/ozone/common/native_pixmap_egl_binding.cc
+@@ -8,7 +8,7 @@
+ #include "base/memory/scoped_refptr.h"
+ #include "base/notreached.h"
+ #include "ui/gl/gl_bindings.h"
+-#include "ui/gl/gl_image_native_pixmap.h"
++#include "ui/gl/native_pixmap_egl_binding_helper.h"
+ 
+ namespace ui {
+ 
+@@ -50,9 +50,9 @@ unsigned BufferFormatToGLDataType(gfx::BufferFormat format) {
+ }  // namespace
+ 
+ NativePixmapEGLBinding::NativePixmapEGLBinding(
+-    scoped_refptr<gl::GLImageNativePixmap> gl_image,
++    std::unique_ptr<gl::NativePixmapEGLBindingHelper> binding_helper,
+     gfx::BufferFormat format)
+-    : gl_image_(std::move(gl_image)), format_(format) {}
++    : binding_helper_(std::move(binding_helper)), format_(format) {}
+ NativePixmapEGLBinding::~NativePixmapEGLBinding() = default;
+ 
+ // static
+@@ -64,22 +64,22 @@ std::unique_ptr<NativePixmapGLBinding> NativePixmapEGLBinding::Create(
+     const gfx::ColorSpace& color_space,
+     GLenum target,
+     GLuint texture_id) {
+-  auto gl_image = gl::GLImageNativePixmap::CreateForPlane(
++  auto binding_helper = gl::NativePixmapEGLBindingHelper::CreateForPlane(
+       plane_size, plane_format, plane, std::move(pixmap), color_space, target,
+       texture_id);
+-  if (!gl_image) {
+-    LOG(ERROR) << "Unable to initialize GL image from pixmap";
++  if (!binding_helper) {
++    LOG(ERROR) << "Unable to initialize binding from pixmap";
+     return nullptr;
+   }
+ 
+-  auto binding = std::make_unique<NativePixmapEGLBinding>(std::move(gl_image),
+-                                                          plane_format);
++  auto binding = std::make_unique<NativePixmapEGLBinding>(
++      std::move(binding_helper), plane_format);
+ 
+   return binding;
+ }
+ 
+ GLuint NativePixmapEGLBinding::GetInternalFormat() {
+-  return gl_image_->GetInternalFormat();
++  return binding_helper_->GetInternalFormat();
+ }
+ 
+ GLenum NativePixmapEGLBinding::GetDataType() {
+diff --git a/ui/ozone/common/native_pixmap_egl_binding.h b/ui/ozone/common/native_pixmap_egl_binding.h
+index 44d68be3527a4..c0382b1068426 100644
+--- a/ui/ozone/common/native_pixmap_egl_binding.h
++++ b/ui/ozone/common/native_pixmap_egl_binding.h
+@@ -15,16 +15,17 @@ class ColorSpace;
+ }
+ 
+ namespace gl {
+-class GLImageNativePixmap;
++class NativePixmapEGLBindingHelper;
+ }
+ 
+ namespace ui {
+ 
+-// A binding maintained between GLImageNativePixmap and GL Textures in Ozone.
++// A binding maintained between NativePixmap and GL Textures in Ozone.
+ class NativePixmapEGLBinding : public NativePixmapGLBinding {
+  public:
+-  NativePixmapEGLBinding(scoped_refptr<gl::GLImageNativePixmap> gl_image,
+-                         gfx::BufferFormat format);
++  NativePixmapEGLBinding(
++      std::unique_ptr<gl::NativePixmapEGLBindingHelper> binding_helper,
++      gfx::BufferFormat format);
+   ~NativePixmapEGLBinding() override;
+ 
+   static std::unique_ptr<NativePixmapGLBinding> Create(
+@@ -41,10 +42,7 @@ class NativePixmapEGLBinding : public NativePixmapGLBinding {
+   GLenum GetDataType() override;
+ 
+  private:
+-  // TODO(hitawala): Merge BindTexImage, Initialize from GLImage and its
+-  // subclass NativePixmap to NativePixmapEGLBinding once we stop using them
+-  // elsewhere eg. VDA decoders in media.
+-  scoped_refptr<gl::GLImageNativePixmap> gl_image_;
++  std::unique_ptr<gl::NativePixmapEGLBindingHelper> binding_helper_;
+ 
+   gfx::BufferFormat format_;
+ };
+diff --git a/ui/ozone/gl/BUILD.gn b/ui/ozone/gl/BUILD.gn
+index 4fc90f0471362..6064eb6f83a8c 100644
+--- a/ui/ozone/gl/BUILD.gn
++++ b/ui/ozone/gl/BUILD.gn
+@@ -9,6 +9,14 @@ test("ozone_gl_unittests") {
+ 
+   deps = [
+     "//base/test:test_support",
++
++    # NOTE: The above tests of gpu::GLImageNativePixmap cannot easily be made
++    # to run as part of //gpu's gl_tests or gpu_unittests: they crash when run
++    # with the former due to differences in GL configuration, and they are
++    # skipped when run with the latter due to differences in Ozone
++    # configuration. Simply leave them here with this dependency for the short
++    # time remaining until GLImageNativePixmap is eliminated altogether.
++    "//gpu/command_buffer/service:gles2",
+     "//testing/gtest",
+     "//ui/gfx",
+     "//ui/gl:run_all_unittests",
+diff --git a/ui/ozone/gl/DEPS b/ui/ozone/gl/DEPS
+new file mode 100644
+index 0000000000000..e6142e85d2154
+--- /dev/null
++++ b/ui/ozone/gl/DEPS
+@@ -0,0 +1,6 @@
++specific_include_rules = {
++  # NOTE: See comment in ./BUILD.gn with respect to this dependency.
++  "gl_image_ozone_native_pixmap_unittest\.cc": [
++    "+gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h",
++  ],
++}
+diff --git a/ui/ozone/gl/gl_image_ozone_native_pixmap_unittest.cc b/ui/ozone/gl/gl_image_ozone_native_pixmap_unittest.cc
+index 9a538903c8ff0..1527df91a3238 100644
+--- a/ui/ozone/gl/gl_image_ozone_native_pixmap_unittest.cc
++++ b/ui/ozone/gl/gl_image_ozone_native_pixmap_unittest.cc
+@@ -5,10 +5,10 @@
+ #include <stdint.h>
+ #include <memory>
+ 
++#include "gpu/command_buffer/service/shared_image/gl_image_native_pixmap.h"
+ #include "testing/gtest/include/gtest/gtest.h"
+ #include "ui/gfx/buffer_types.h"
+ #include "ui/gfx/client_native_pixmap.h"
+-#include "ui/gl/gl_image_native_pixmap.h"
+ #include "ui/gl/test/gl_image_test_template.h"
+ #include "ui/ozone/public/client_native_pixmap_factory_ozone.h"
+ #include "ui/ozone/public/ozone_platform.h"
+@@ -83,7 +83,7 @@ class GLImageNativePixmapTestDelegate : public GLImageTestDelegateBase {
+       glGenTextures(1, &texture_id_);
+     }
+ 
+-    auto image = gl::GLImageNativePixmap::Create(
++    auto image = gpu::GLImageNativePixmap::Create(
+         size, format, std::move(pixmap), GetTextureTarget(), texture_id_);
+     EXPECT_TRUE(image);
+     return image;
+@@ -100,8 +100,9 @@ class GLImageNativePixmapTestDelegate : public GLImageTestDelegateBase {
+         format == gfx::BufferFormat::YUV_420_BIPLANAR) {
+       return 1;
+     }
+-    if (format == gfx::BufferFormat::P010)
++    if (format == gfx::BufferFormat::P010) {
+       return 3;
++    }
+     return 0;
+   }
+ 
