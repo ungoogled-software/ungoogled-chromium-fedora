@@ -57,6 +57,13 @@
 %global __python3 /usr/bin/python3
 %endif
 
+# ungoogled-chromium: enable|disable PGO
+%if 0%{?fedora} >= 38
+%global use_pgo 1
+%else
+%global use_pgo 0
+%endif
+
 # set nodejs_version
 %global nodejs_version v19.8.1
 
@@ -185,7 +192,7 @@
 
 Name:	ungoogled-chromium
 Version: 112.0.5615.165
-Release: 1%{?dist}
+Release: 2%{?dist}
 Summary: A lightweight approach to removing Google web service dependency
 Url: https://github.com/Eloston/ungoogled-chromium
 License: BSD-3-Clause AND LGPL-2.1-or-later AND Apache-2.0 AND IJG AND MIT AND GPL-2.0-or-later AND ISC AND OpenSSL AND (MPL-1.1 OR GPL-2.0-only OR LGPL-2.0-only)
@@ -975,6 +982,11 @@ CHROMIUM_BROWSER_GN_DEFINES+=' use_system_libffi=true'
 CHROMIUM_BROWSER_GN_DEFINES+=' '
 CHROMIUM_BROWSER_GN_DEFINES+=$(tr '\n' ' ' < %{ungoogled_chromium_root}/flags.gn)
 
+#ungoogled-chromium: enable PGO
+%if %{use_pgo}
+CHROMIUM_BROWSER_GN_DEFINES+=' chrome_pgo_phase=2'
+%endif
+
 export CHROMIUM_BROWSER_GN_DEFINES
 
 # headless gn defines
@@ -991,8 +1003,11 @@ CHROMIUM_HEADLESS_GN_DEFINES+=' media_use_libvpx=false proprietary_codecs=false'
 export CHROMIUM_HEADLESS_GN_DEFINES
 
 # ungoogled-chromium: binary pruning.
+# Exclude PGO profile from binary pruning
+%if %{use_pgo}
+sed -i '\!chrome/build/pgo_profiles/.*!d' %{ungoogled_chromium_root}/pruning.list
+%endif
 python3 -B %{ungoogled_chromium_root}/utils/prune_binaries.py . %{ungoogled_chromium_root}/pruning.list || true
-
 
 build/linux/unbundle/replace_gn_files.py --system-libraries \
 %if ! %{bundlelibaom}
