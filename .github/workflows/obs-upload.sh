@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-RELEASES='rhel:7 rhel:8 fedora:33 fedora:34'
+RELEASES='fedora:37 fedora:38'
 
 for i in git curl xmlstarlet rpmspec
 do
@@ -113,19 +113,6 @@ generate_obs()
             cp "${BASE}/${i}" "${ROOT}"
         fi
     done
-    revision="$(sed -n -r '/^%global *depot_tools_revision */s;%global *depot_tools_revision * ([^ ]+) *;\1;p' "${SPECFILE}")"
-    cat >> "${ROOT}/_service" << EOF
-    <service name="tar_scm">
-        <param name="scm">git</param>
-        <param name="url">https://chromium.googlesource.com/chromium/tools/depot_tools.git</param>
-        <param name="version">${revision}</param>
-        <param name="revision">${revision}</param>
-    </service>
-    <service name="recompress">
-        <param name="compression">xz</param>
-        <param name="file">*.tar</param>
-    </service>
-EOF
     printf '</services>\n' >> "${ROOT}/_service"
 
     rm -f "${ROOT}/files"
