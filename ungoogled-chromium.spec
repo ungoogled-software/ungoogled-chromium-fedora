@@ -440,7 +440,11 @@ BuildRequires:	freetype-devel
 %endif
 
 # One of the python scripts invokes git to look for a hash. So helpful.
+%if %{obs}
+BuildRequires:	git
+%else
 BuildRequires:	/usr/bin/git
+%endif
 BuildRequires:	hwdata
 BuildRequires:	kernel-headers
 BuildRequires:	libevent-devel
