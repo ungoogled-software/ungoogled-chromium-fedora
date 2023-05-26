@@ -1,6 +1,6 @@
-diff -up chromium-99.0.4844.51/components/os_crypt/features.gni.disblegnomekeyring chromium-99.0.4844.51/components/os_crypt/features.gni
---- chromium-99.0.4844.51/components/os_crypt/features.gni.disblegnomekeyring	2022-03-05 14:24:15.073877597 -0500
-+++ chromium-99.0.4844.51/components/os_crypt/features.gni	2022-03-05 14:25:04.174183483 -0500
+diff -up chromium-113.0.5672.24/components/os_crypt/sync/features.gni.disblegnomekeyring chromium-113.0.5672.24/components/os_crypt/sync/features.gni
+--- chromium-113.0.5672.24/components/os_crypt/sync/features.gni.disblegnomekeyring	2023-04-07 14:23:11.083985460 +0200
++++ chromium-113.0.5672.24/components/os_crypt/sync/features.gni	2023-04-07 14:23:44.276599353 +0200
 @@ -8,7 +8,7 @@ import("//build/config/ui.gni")
  declare_args() {
    # Whether to use libgnome-keyring (deprecated by libsecret).
