@@ -1,27 +1,29 @@
-diff -up chromium-108.0.5359.124/AUTHORS.first_dts chromium-108.0.5359.124/AUTHORS
---- chromium-108.0.5359.124/AUTHORS.first_dts	2022-12-31 15:30:52.923006393 +0100
-+++ chromium-108.0.5359.124/AUTHORS	2022-12-31 15:32:50.431215836 +0100
-@@ -97,6 +97,7 @@ Andra Paraschiv <andra.paraschiv@intel.c
- Andras Tokodi <a.tokodi@eyeo.com>
- Andreas Nazlidis <andreas221b@gmail.com>
- Andreas Papacharalampous <andreas@apap04.com>
-+Andreas Schneider <asn@cryptomilk.org>
- Andrei Borza <andrei.borza@gmail.com>
- Andrei Parvu <andrei.prv@gmail.com>
- Andrei Parvu <parvu@adobe.com>
-diff -up chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.cc.first_dts chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.cc
---- chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.cc.first_dts	2022-12-14 01:39:52.000000000 +0100
-+++ chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.cc	2022-12-31 15:30:52.923006393 +0100
-@@ -58,7 +58,7 @@ namespace media {
- 
- namespace {
- 
--constexpr int64_t kInvalidPTSMarker = static_cast<int64_t>(0x8000000000000000);
-+constexpr int64_t kRelativeTsBase = static_cast<int64_t>(0x7ffeffffffffffff);
- 
- void SetAVStreamDiscard(AVStream* stream, AVDiscard discard) {
-   DCHECK(stream);
-@@ -91,7 +91,7 @@ static base::TimeDelta FramesToTimeDelta
+From 2aef9000a1c8d76d3072365ffcb471ebffa20d3d Mon Sep 17 00:00:00 2001
+From: Andreas Schneider <asn@cryptomilk.org>
+Date: Tue, 15 Mar 2022 14:26:16 +0100
+Subject: [PATCH] Track first_dts instead of using non-upstream functions
+
+The function av_stream_get_first_dts() is not an upstream ffmpeg function and
+is not available if you build with system ffmpeg. We can easily track the
+first_dts on our own.
+
+See also
+https://ffmpeg.org/pipermail/ffmpeg-devel/2021-September/285401.html
+
+Bug: 1306560
+
+Signed-off-by: Andreas Schneider <asn@cryptomilk.org>
+Change-Id: I90ba3cf2f2e16f56a0b405f26c67f911349fb71d
+---
+ media/filters/ffmpeg_demuxer.cc | 18 ++++++++++++------
+ media/filters/ffmpeg_demuxer.h  |  3 +++
+ 3 files changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/media/filters/ffmpeg_demuxer.cc b/media/filters/ffmpeg_demuxer.cc
+index 111899b661..799fc6e941 100644
+--- a/media/filters/ffmpeg_demuxer.cc
++++ b/media/filters/ffmpeg_demuxer.cc
+@@ -97,7 +97,7 @@ static base::TimeDelta FramesToTimeDelta(int frames, double sample_rate) {
                              sample_rate);
  }
  
@@ -30,7 +32,7 @@ diff -up chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.cc.first_dts chrom
    // The default start time is zero.
    base::TimeDelta start_time;
  
-@@ -101,12 +101,12 @@ static base::TimeDelta ExtractStartTime(
+@@ -107,12 +107,12 @@ static base::TimeDelta ExtractStartTime(AVStream* stream) {
  
    // Next try to use the first DTS value, for codecs where we know PTS == DTS
    // (excludes all H26x codecs). The start time must be returned in PTS.
@@ -45,7 +47,7 @@ diff -up chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.cc.first_dts chrom
      if (first_pts < start_time)
        start_time = first_pts;
    }
-@@ -275,6 +275,7 @@ FFmpegDemuxerStream::FFmpegDemuxerStream
+@@ -283,6 +283,7 @@ FFmpegDemuxerStream::FFmpegDemuxerStream(
        fixup_negative_timestamps_(false),
        fixup_chained_ogg_(false),
        num_discarded_packet_warnings_(0),
@@ -53,27 +55,18 @@ diff -up chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.cc.first_dts chrom
        last_packet_pos_(AV_NOPTS_VALUE),
        last_packet_dts_(AV_NOPTS_VALUE) {
    DCHECK(demuxer_);
-@@ -341,6 +342,11 @@ void FFmpegDemuxerStream::EnqueuePacket(
+@@ -349,6 +350,10 @@ void FFmpegDemuxerStream::EnqueuePacket(ScopedAVPacket packet) {
    int64_t packet_dts =
        packet->dts == AV_NOPTS_VALUE ? packet->pts : packet->dts;
  
-+  if (first_dts_ == AV_NOPTS_VALUE && packet->dts != AV_NOPTS_VALUE &&
-+      last_packet_dts_ != AV_NOPTS_VALUE) {
-+    first_dts_ = packet->dts - (last_packet_dts_ + kRelativeTsBase);
++  if (first_dts_ == AV_NOPTS_VALUE) {
++    first_dts_ = packet_dts;
 +  }
 +
    // Chained ogg files have non-monotonically increasing position and time stamp
    // values, which prevents us from using them to determine if a packet should
    // be dropped. Since chained ogg is only allowed on single track audio only
-@@ -683,6 +689,7 @@ void FFmpegDemuxerStream::FlushBuffers(b
-   ResetBitstreamConverter();
- 
-   if (!preserve_packet_position) {
-+    first_dts_ = AV_NOPTS_VALUE;
-     last_packet_pos_ = AV_NOPTS_VALUE;
-     last_packet_dts_ = AV_NOPTS_VALUE;
-   }
-@@ -1434,7 +1441,8 @@ void FFmpegDemuxer::OnFindStreamInfoDone
+@@ -1442,7 +1447,8 @@ void FFmpegDemuxer::OnFindStreamInfoDone(int result) {
  
      max_duration = std::max(max_duration, streams_[i]->duration());
  
@@ -83,7 +76,7 @@ diff -up chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.cc.first_dts chrom
  
      // Note: This value is used for seeking, so we must take the true value and
      // not the one possibly clamped to zero below.
-@@ -1591,7 +1599,7 @@ FFmpegDemuxerStream* FFmpegDemuxer::Find
+@@ -1599,7 +1605,7 @@ FFmpegDemuxerStream* FFmpegDemuxer::FindStreamWithLowestStartTimestamp(
    for (const auto& stream : streams_) {
      if (!stream || stream->IsEnabled() != enabled)
        continue;
@@ -92,7 +85,7 @@ diff -up chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.cc.first_dts chrom
        continue;
      if (!lowest_start_time_stream ||
          stream->start_time() < lowest_start_time_stream->start_time()) {
-@@ -1612,7 +1620,7 @@ FFmpegDemuxerStream* FFmpegDemuxer::Find
+@@ -1620,7 +1626,7 @@ FFmpegDemuxerStream* FFmpegDemuxer::FindPreferredStreamForSeeking(
      if (stream->type() != DemuxerStream::VIDEO)
        continue;
  
@@ -101,17 +94,11 @@ diff -up chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.cc.first_dts chrom
        continue;
  
      if (!stream->IsEnabled())
-@@ -1926,4 +1934,4 @@ void FFmpegDemuxer::RunPendingSeekCB(Pip
-   std::move(pending_seek_cb_).Run(status);
- }
- 
--}  // namespace media
-+}  // namespace media
-\ Kein Zeilenumbruch am Dateiende.
-diff -up chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.h.first_dts chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.h
---- chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.h.first_dts	2022-12-14 01:39:52.000000000 +0100
-+++ chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.h	2022-12-31 15:30:52.924006403 +0100
-@@ -145,6 +145,8 @@ class MEDIA_EXPORT FFmpegDemuxerStream :
+diff --git a/media/filters/ffmpeg_demuxer.h b/media/filters/ffmpeg_demuxer.h
+index c147309d6f..48a8f6ad8c 100644
+--- a/media/filters/ffmpeg_demuxer.h
++++ b/media/filters/ffmpeg_demuxer.h
+@@ -151,6 +151,8 @@ class MEDIA_EXPORT FFmpegDemuxerStream : public DemuxerStream {
    base::TimeDelta start_time() const { return start_time_; }
    void set_start_time(base::TimeDelta time) { start_time_ = time; }
  
@@ -120,7 +107,7 @@ diff -up chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.h.first_dts chromi
   private:
    friend class FFmpegDemuxerTest;
  
-@@ -202,6 +204,7 @@ class MEDIA_EXPORT FFmpegDemuxerStream :
+@@ -208,6 +210,7 @@ class MEDIA_EXPORT FFmpegDemuxerStream : public DemuxerStream {
    bool fixup_chained_ogg_;
  
    int num_discarded_packet_warnings_;
@@ -128,3 +115,6 @@ diff -up chromium-108.0.5359.124/media/filters/ffmpeg_demuxer.h.first_dts chromi
    int64_t last_packet_pos_;
    int64_t last_packet_dts_;
  };
+-- 
+2.35.1
+

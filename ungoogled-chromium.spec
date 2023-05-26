@@ -1,4 +1,4 @@
-%global obs 0
+%global obs 1
 %global ninja_verbose 0
 %global ccache 0
 
@@ -191,8 +191,8 @@
 %global debug_pkg 0
 
 Name:	ungoogled-chromium
-Version: 112.0.5615.165
-Release: 2%{?dist}
+Version: 113.0.5672.126
+Release: 1%{?dist}
 Summary: A lightweight approach to removing Google web service dependency
 Url: https://github.com/Eloston/ungoogled-chromium
 License: BSD-3-Clause AND LGPL-2.1-or-later AND Apache-2.0 AND IJG AND MIT AND GPL-2.0-or-later AND ISC AND OpenSSL AND (MPL-1.1 OR GPL-2.0-only OR LGPL-2.0-only)
@@ -211,9 +211,6 @@ Patch2: chromium-107.0.5304.110-gn-system.patch
 Patch5: chromium-77.0.3865.75-no-zlib-mangle.patch
 # Try to load widevine from other places
 Patch8: chromium-108-widevine-other-locations.patch
-
-# Do not download proprietary widevine module in the background (thanks Debian)
-Patch9: chromium-99.0.4844.51-widevine-no-download.patch
 
 # Tell bootstrap.py to always use the version of Python we specify
 Patch11: chromium-93.0.4577.63-py3-bootstrap.patch
@@ -254,24 +251,24 @@ Patch89: chromium-108-system-brotli.patch
 
 # disable GlobalMediaControlsCastStartStop to avoid crash
 # when using the address bar media player button
-Patch90: chromium-109-disable-GlobalMediaControlsCastStartStop.patch
+Patch90: chromium-113-disable-GlobalMediaControlsCastStartStop.patch
 
 # patch for using system opus
 Patch91: chromium-108-system-opus.patch
 
-# fix prefers-color-scheme
-Patch92: chromium-110-gtktheme.patch
+# enable WebUIDarkMode
+Patch92: chromium-113-WebUIDarkMode.patch
 
 # system ffmpeg
 Patch114: chromium-107-ffmpeg-duration.patch
 Patch115: chromium-107-proprietary-codecs.patch
 # drop av_stream_get_first_dts from internal ffmpeg
-Patch116: chromium-108-ffmpeg-first_dts.patch
+Patch116: chromium-112-ffmpeg-first_dts.patch
 # revert new-channel-layout-api on f36, old ffmpeg-free
 Patch117: chromium-108-ffmpeg-revert-new-channel-layout-api.patch
 
 # gcc13
-Patch122: chromium-109-gcc13.patch
+Patch122: chromium-113-gcc13.patch
 
 # Patches by Stephan Hartmann, https://github.com/stha09/chromium-patches
 Patch130: chromium-103-VirtualCursor-std-layout.patch
@@ -279,17 +276,12 @@ Patch130: chromium-103-VirtualCursor-std-layout.patch
 # Pagesize > 4kb
 Patch146: chromium-110-LargerThan4k.patch
 
-# VAAPI
-# Upstream turned VAAPI on in Linux in 86
-Patch202: chromium-104.0.5112.101-enable-hardware-accelerated-mjpeg.patch
-Patch203: chromium-112-check-passthrough-command-decoder.patch
-Patch204: chromium-112-invert_of_GLImageNativePixmap_NativePixmapEGLBinding.patch
-Patch205: chromium-86.0.4240.75-fix-vaapi-on-intel.patch
-Patch206: chromium-112-ozone-wayland-vaapi-support.patch
-Patch207: chromium-112-enable-vaapi-ozone-wayland.patch
-
 # Apply these patches to work around EPEL8 issues
-Patch300: chromium-99.0.4844.51-rhel8-force-disable-use_gnome_keyring.patch
+Patch300: chromium-113-rhel8-force-disable-use_gnome_keyring.patch
+# workaround for clang bug, https://github.com/llvm/llvm-project/issues/57826
+Patch302: chromium-113-workaround_clang_bug-structured_binding.patch
+# declare iterators as subtypes
+Patch303: chromium-113-typename.patch
 
 # RPM Fusion patches [free/chromium-freeworld]:
 Patch503:       chromium-manpage.patch
@@ -328,7 +320,7 @@ Source13: master_preferences
 Source22:       ungoogled-chromium.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 112.0.5615.165-1
+%global ungoogled_chromium_revision 113.0.5672.126-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 %if %{clang}
@@ -731,7 +723,6 @@ Requires: minizip-compat%{_isa}
 %patch -P2 -p1 -b .gnsystem
 %patch -P5 -p1 -b .nozlibmangle
 %patch -P8 -p1 -b .widevine-other-locations
-%patch -P9 -p1 -b .widevine-no-download
 %patch -P11 -p1 -b .py3
 
 %patch -P20 -p1 -b .disable-font-test
@@ -763,7 +754,7 @@ Requires: minizip-compat%{_isa}
 %patch -P91 -p1 -b .system-opus
 %endif
 
-%patch -P92 -p1 -b .gtk-prefers-color-scheme
+%patch -P92 -p1 -b .WebUIDarkMod
 
 %if ! %{bundleffmpegfree}
 %patch -P114 -p1 -b .system-ffmppeg
@@ -780,18 +771,16 @@ Requires: minizip-compat%{_isa}
 
 %patch -P122 -p1 -b .gcc13
 
-# Feature specific patches
-%if %{use_vaapi}
-%patch -P202 -p1 -b .accel-mjpeg
-%patch -P203 -p1 -R -b .revert
-%patch -P204 -p1 -R -b .revert
-%patch -P205 -p1 -b .vaapi-intel-fix
-%patch -P206 -p1 -b .wayland-vaapi
-%patch -P207 -p1 -b .enable-wayland-vaapi
-%endif
-
 # Always disable gnome keyring
 %patch -P300 -p1 -b .disblegnomekeyring
+
+%if %{clang}
+%if 0%{?fedora} < 38
+%patch -P302 -p1 -b .workaround_clang_bug-structured_binding
+%endif
+%endif
+
+%patch -P303 -p1 -b .typename
 
 # RPM Fusion patches [free/chromium-freeworld]:
 %patch503 -p1 -b .manpage
@@ -846,7 +835,7 @@ export LANG=en_US.UTF-8
 %if %{clang}
 FLAGS=' -Wno-deprecated-declarations -Wno-unknown-warning-option -Wno-unused-command-line-argument'
 FLAGS+=' -Wno-unused-but-set-variable -Wno-unused-result -Wno-unused-function -Wno-unused-variable'
-FLAGS+=' -Wno-unused-const-variable -Wno-unneeded-internal-declaration'
+FLAGS+=' -Wno-unused-const-variable -Wno-unneeded-internal-declaration -Wno-unknown-attributes'
 %endif
 
 %if %{system_build_flags}
@@ -1245,7 +1234,7 @@ fi
 %{chromium_path}/chrome_crashpad_handler
 %{chromium_path}/resources.pak
 %{chromium_path}/%{chromium_browser_channel}
-%{chromium_path}/%{chromium_browser_channel}.sh
+%attr(0755, root, root) %{chromium_path}/%{chromium_browser_channel}.sh
 %attr(4755, root, root) %{chromium_path}/chrome-sandbox
 %if %{use_qt}
 %{chromium_path}/libqt5_shim.so

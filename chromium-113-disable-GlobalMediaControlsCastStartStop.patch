@@ -1,0 +1,12 @@
+diff -up chromium-113.0.5672.24/chrome/browser/media/router/media_router_feature.cc.disable-GlobalMediaControlsCastStartStop chromium-113.0.5672.24/chrome/browser/media/router/media_router_feature.cc
+--- chromium-113.0.5672.24/chrome/browser/media/router/media_router_feature.cc.disable-GlobalMediaControlsCastStartStop	2023-04-07 13:54:52.562292026 +0200
++++ chromium-113.0.5672.24/chrome/browser/media/router/media_router_feature.cc	2023-04-07 13:57:41.470414086 +0200
+@@ -68,7 +68,7 @@ BASE_FEATURE(kGlobalMediaControlsCastSta
+ #else
+ BASE_FEATURE(kGlobalMediaControlsCastStartStop,
+              "GlobalMediaControlsCastStartStop",
+-             base::FEATURE_ENABLED_BY_DEFAULT);
++             base::FEATURE_DISABLED_BY_DEFAULT);
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ #endif  // BUILDFLAG(IS_ANDROID)
+ 
