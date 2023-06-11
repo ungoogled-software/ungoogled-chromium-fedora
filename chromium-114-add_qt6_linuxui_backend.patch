@@ -1,0 +1,545 @@
+commit 75f4b48eb71d4872ba3ac6c9fc3662a60eb4175d
+Author: Tom Anderson <thomasanderson@chromium.org>
+Date:   Thu Apr 27 02:21:34 2023 +0000
+
+    Add QT6 LinuxUi backend
+    
+    - Enable QT6 by default on KDE6
+    - If QT6 load fails, fallback to QT5 (and vice versa)
+    - Add use_qt6 build flag for packager control
+    - Add --qt-version runtime flag for user control
+    
+    R=thestig
+    
+    Change-Id: Ib1d9f6183663ecf7b9ddfe9d7f3e3442e534ccda
+    Fixed: 1434754
+    Reviewed-on: https://chromium-review.googlesource.com/c/chromium/src/+/4475369
+    Commit-Queue: Thomas Anderson <thomasanderson@chromium.org>
+    Reviewed-by: Lei Zhang <thestig@chromium.org>
+    Cr-Commit-Position: refs/heads/main@{#1136295}
+
+diff --git a/chrome/installer/linux/BUILD.gn b/chrome/installer/linux/BUILD.gn
+index 5639b9ffc996e..3bacd3398d4a2 100644
+--- a/chrome/installer/linux/BUILD.gn
++++ b/chrome/installer/linux/BUILD.gn
+@@ -109,6 +109,9 @@ if (use_qt) {
+   # to prevent a hard dependency on QT for the package.
+   packaging_files += [ "$root_out_dir/libqt5_shim.so" ]
+ }
++if (use_qt6) {
++  packaging_files += [ "$root_out_dir/libqt6_shim.so" ]
++}
+ 
+ action_foreach("calculate_deb_dependencies") {
+   deps = [ ":installer_deps" ]
+@@ -249,6 +252,12 @@ if (use_qt) {
+     deps = [ "//ui/qt:qt5_shim" ]
+   }
+ }
++if (use_qt6) {
++  strip_binary("strip_qt6_shim") {
++    binary_input = "$root_out_dir/libqt6_shim.so"
++    deps = [ "//ui/qt:qt6_shim" ]
++  }
++}
+ 
+ # This target builds all "normal" Linux installers.  You must set
+ # is_component_build=false before building this target.
+@@ -447,6 +456,12 @@ group("installer_deps") {
+       "//ui/qt:qt5_shim",
+     ]
+   }
++  if (use_qt6) {
++    public_deps += [
++      ":strip_qt6_shim",
++      "//ui/qt:qt6_shim",
++    ]
++  }
+ }
+ 
+ # Creates .deb and .rpm (RPM for non-ChromeOS only) installer packages.
+diff --git a/chrome/installer/linux/common/installer.include b/chrome/installer/linux/common/installer.include
+index 8d76f1f280b01..439ef5ccb0f52 100644
+--- a/chrome/installer/linux/common/installer.include
++++ b/chrome/installer/linux/common/installer.include
+@@ -254,6 +254,11 @@ stage_install_common() {
+     strippedfile="${OUTPUTDIR}/${file}.stripped"
+     install -m ${SHLIB_PERMS} "${strippedfile}" "${STAGEDIR}/${INSTALLDIR}/${file}"
+   fi
++  if [ -f "${OUTPUTDIR}/libqt6_shim.so" ]; then
++    file="libqt6_shim.so"
++    strippedfile="${OUTPUTDIR}/${file}.stripped"
++    install -m ${SHLIB_PERMS} "${strippedfile}" "${STAGEDIR}/${INSTALLDIR}/${file}"
++  fi
+ 
+   # libc++
+   if [ -f "${OUTPUTDIR}/lib/libc++.so" ]; then
+diff --git a/ui/qt/BUILD.gn b/ui/qt/BUILD.gn
+index bbede00daa4d0..6a67961edc2f7 100644
+--- a/ui/qt/BUILD.gn
++++ b/ui/qt/BUILD.gn
+@@ -11,13 +11,6 @@ assert(use_qt)
+ assert(is_linux)
+ assert(!is_castos)
+ 
+-pkg_config("qt5_config") {
+-  packages = [
+-    "Qt5Core",
+-    "Qt5Widgets",
+-  ]
+-}
+-
+ config("qt_internal_config") {
+   if (is_clang) {
+     # libstdc++ headers are incompatible with -fcomplete-member-pointers.
+@@ -56,40 +49,57 @@ if (!use_sysroot) {
+   }
+ }
+ 
+-shared_library("qt5_shim") {
+-  visibility = [
+-    ":qt",
+-    "//chrome/installer/linux:*",
+-  ]
+-
+-  # Since qt_shim is a shared library even in non-component builds, it shouldn't
+-  # depend on any other targets since that would duplicate code between binaries
+-  # leading to increased size and potential issues from duplicated global state.
+-  no_default_deps = true
+-  assert_no_deps = [
+-    "//base",
+-    "//buildtools/third_party/libc++",
+-  ]
+-  deps = [ ":qt_interface" ]
+-
+-  configs -= [ "//build/config/compiler:runtime_library" ]
+-  configs += [
+-    ":qt_internal_config",
+-    ":qt5_config",
+-  ]
++template("qt_shim") {
++  pkg_config("qt" + invoker.qt_version + "_config") {
++    packages = [
++      "Qt" + invoker.qt_version + "Core",
++      "Qt" + invoker.qt_version + "Widgets",
++    ]
++  }
+ 
+-  public = []
+-  sources = [
+-    "qt_shim.cc",
+-    "qt_shim.h",
+-  ]
+-  if (use_sysroot) {
+-    # This file is generated with gen_qt_shim_moc.sh on an amd64 system to
+-    # avoid a build-time dependency on `moc` when using the sysroot.
+-    sources += [ "qt_shim_moc.cc" ]
+-  } else {
+-    sources += get_target_outputs(":generate_moc")
+-    deps += [ ":generate_moc" ]
++  shared_library(target_name) {
++    visibility = [
++      ":qt",
++      "//chrome/installer/linux:*",
++    ]
++
++    # Since qt_shim is a shared library even in non-component builds, it shouldn't
++    # depend on any other targets since that would duplicate code between binaries
++    # leading to increased size and potential issues from duplicated global state.
++    no_default_deps = true
++    assert_no_deps = [
++      "//base",
++      "//buildtools/third_party/libc++",
++    ]
++    deps = [ ":qt_interface" ]
++
++    configs -= [ "//build/config/compiler:runtime_library" ]
++    configs += [
++      ":qt_internal_config",
++      ":qt" + invoker.qt_version + "_config",
++    ]
++
++    public = []
++    sources = [
++      "qt_shim.cc",
++      "qt_shim.h",
++    ]
++    if (use_sysroot) {
++      # This file is generated with gen_qt_shim_moc.sh on an amd64 system to
++      # avoid a build-time dependency on `moc` when using the sysroot.
++      sources += [ "qt" + invoker.qt_version + "_shim_moc.cc" ]
++    } else {
++      sources += get_target_outputs(":generate_moc")
++      deps += [ ":generate_moc" ]
++    }
++  }
++}
++qt_shim("qt5_shim") {
++  qt_version = "5"
++}
++if (use_qt6) {
++  qt_shim("qt6_shim") {
++    qt_version = "6"
+   }
+ }
+ 
+@@ -100,6 +110,9 @@ component("qt") {
+ 
+   # qt_shim is in data_deps since we want to load it manually.
+   data_deps = [ ":qt5_shim" ]
++  if (use_qt6) {
++    data_deps += [ ":qt6_shim" ]
++  }
+   deps = [
+     ":qt_interface",
+     "//base",
+diff --git a/ui/qt/gen_qt_shim_moc.sh b/ui/qt/gen_qt_shim_moc.sh
+index 74272d5611dab..9d02c2dfcb12f 100755
+--- a/ui/qt/gen_qt_shim_moc.sh
++++ b/ui/qt/gen_qt_shim_moc.sh
+@@ -6,11 +6,15 @@
+ set -o nounset
+ set -o errexit
+ 
+-URL="http://archive.debian.org/debian/pool/main/q/qtbase-opensource-src"
+-PACKAGE="qtbase5-dev-tools_5.3.2+dfsg-4+deb8u2_amd64.deb"
+-SHA256="7703754f2c230ce6b8b6030b6c1e7e030899aa9f45a415498df04bd5ec061a76"
+-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
++URL5="http://archive.debian.org/debian/pool/main/q/qtbase-opensource-src"
++PACKAGE5="qtbase5-dev-tools_5.3.2+dfsg-4+deb8u2_amd64.deb"
++SHA256_5="7703754f2c230ce6b8b6030b6c1e7e030899aa9f45a415498df04bd5ec061a76"
++
++URL6="http://archive.ubuntu.com/ubuntu/pool/universe/q/qt6-base"
++PACKAGE6="qt6-base-dev-tools_6.2.4+dfsg-2ubuntu1_amd64.deb"
++SHA256_6="8dddfc79e7743185b07c478ca0f96a4ccc13d48ecccc42f44d2578c33c7d9b8b"
+ 
++SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ TMP_DIR=$(mktemp -d -p "$SCRIPT_DIR")
+ function cleanup {
+     rm -rf "$TMP_DIR"
+@@ -18,16 +22,22 @@ function cleanup {
+ trap cleanup EXIT
+ 
+ cd "$TMP_DIR"
+-wget "$URL/$PACKAGE"
+-echo "$SHA256  $PACKAGE" | shasum -a 256 -c
+-dpkg -x "$PACKAGE" .
+-cat > ../qt_shim_moc.cc <<EOF
+-// Copyright 2022 The Chromium Authors
++wget "$URL5/$PACKAGE5"
++echo "$SHA256_5  $PACKAGE5" | shasum -a 256 -c
++dpkg -x "$PACKAGE5" .
++wget "$URL6/$PACKAGE6"
++echo "$SHA256_6  $PACKAGE6" | shasum -a 256 -c
++dpkg -x "$PACKAGE6" .
++cat > ../qt5_shim_moc.cc <<EOF
++// Copyright 2023 The Chromium Authors
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
+ EOF
+ cd "$SCRIPT_DIR/../.."
++cp ui/qt/qt5_shim_moc.cc ui/qt/qt6_shim_moc.cc
+ "$TMP_DIR/usr/lib/x86_64-linux-gnu/qt5/bin/moc" ui/qt/qt_shim.h \
+-    >> ui/qt/qt_shim_moc.cc
+-git cl format ui/qt/qt_shim_moc.cc
++    >> ui/qt/qt5_shim_moc.cc
++"$TMP_DIR//usr/lib/qt6/libexec/moc" ui/qt/qt_shim.h \
++    >> ui/qt/qt6_shim_moc.cc
++git cl format ui/qt/qt5_shim_moc.cc ui/qt/qt6_shim_moc.cc
+diff --git a/ui/qt/qt.gni b/ui/qt/qt.gni
+index 27bb6375880b7..f45823270cb91 100644
+--- a/ui/qt/qt.gni
++++ b/ui/qt/qt.gni
+@@ -4,9 +4,17 @@
+ 
+ import("//build/config/chromecast_build.gni")
+ import("//build/config/sanitizers/sanitizers.gni")
++import("//build/config/sysroot.gni")
+ 
+ declare_args() {
+   # TODO(https://crbug.com/1424435): Allow QT in MSAN builds once QT is
+   # added to the instrumented libraries.
+   use_qt = is_linux && !is_castos && !is_msan
+ }
++
++declare_args() {
++  use_qt6 = use_qt && use_sysroot
++}
++
++# use_qt6 => use_qt
++assert(!use_qt6 || use_qt)
+diff --git a/ui/qt/qt_shim_moc.cc b/ui/qt/qt5_shim_moc.cc
+similarity index 95%
+rename from ui/qt/qt_shim_moc.cc
+rename to ui/qt/qt5_shim_moc.cc
+index dafbfadce56ba..8f8b6b57784a8 100644
+--- a/ui/qt/qt_shim_moc.cc
++++ b/ui/qt/qt5_shim_moc.cc
+@@ -1,4 +1,4 @@
+-// Copyright 2022 The Chromium Authors
++// Copyright 2023 The Chromium Authors
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
+@@ -89,26 +89,32 @@ const QMetaObject* qt::QtShim::metaObject() const {
+ }
+ 
+ void* qt::QtShim::qt_metacast(const char* _clname) {
+-  if (!_clname)
++  if (!_clname) {
+     return 0;
+-  if (!strcmp(_clname, qt_meta_stringdata_qt__QtShim.stringdata))
++  }
++  if (!strcmp(_clname, qt_meta_stringdata_qt__QtShim.stringdata)) {
+     return static_cast<void*>(const_cast<QtShim*>(this));
+-  if (!strcmp(_clname, "QtInterface"))
++  }
++  if (!strcmp(_clname, "QtInterface")) {
+     return static_cast<QtInterface*>(const_cast<QtShim*>(this));
++  }
+   return QObject::qt_metacast(_clname);
+ }
+ 
+ int qt::QtShim::qt_metacall(QMetaObject::Call _c, int _id, void** _a) {
+   _id = QObject::qt_metacall(_c, _id, _a);
+-  if (_id < 0)
++  if (_id < 0) {
+     return _id;
++  }
+   if (_c == QMetaObject::InvokeMetaMethod) {
+-    if (_id < 2)
++    if (_id < 2) {
+       qt_static_metacall(this, _c, _id, _a);
++    }
+     _id -= 2;
+   } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
+-    if (_id < 2)
++    if (_id < 2) {
+       *reinterpret_cast<int*>(_a[0]) = -1;
++    }
+     _id -= 2;
+   }
+   return _id;
+diff --git a/ui/qt/qt6_shim_moc.cc b/ui/qt/qt6_shim_moc.cc
+new file mode 100644
+index 0000000000000..6d02ca317b65d
+--- /dev/null
++++ b/ui/qt/qt6_shim_moc.cc
+@@ -0,0 +1,143 @@
++// Copyright 2023 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++/****************************************************************************
++** Meta object code from reading C++ file 'qt_shim.h'
++**
++** Created by: The Qt Meta Object Compiler version 68 (Qt 6.2.4)
++**
++** WARNING! All changes made in this file will be lost!
++*****************************************************************************/
++
++#include <QtCore/qbytearray.h>
++#include <QtCore/qmetatype.h>
++#include <memory>
++#include "ui/qt/qt_shim.h"
++#if !defined(Q_MOC_OUTPUT_REVISION)
++#error "The header file 'qt_shim.h' doesn't include <QObject>."
++#elif Q_MOC_OUTPUT_REVISION != 68
++#error "This file was generated using the moc from 6.2.4. It"
++#error "cannot be used with the include files from this version of Qt."
++#error "(The moc has changed too much.)"
++#endif
++
++QT_BEGIN_MOC_NAMESPACE
++QT_WARNING_PUSH
++QT_WARNING_DISABLE_DEPRECATED
++struct qt_meta_stringdata_qt__QtShim_t {
++  const uint offsetsAndSize[12];
++  char stringdata0[52];
++};
++#define QT_MOC_LITERAL(ofs, len) \
++  uint(offsetof(qt_meta_stringdata_qt__QtShim_t, stringdata0) + ofs), len
++static const qt_meta_stringdata_qt__QtShim_t qt_meta_stringdata_qt__QtShim = {
++    {
++        QT_MOC_LITERAL(0, 10),   // "qt::QtShim"
++        QT_MOC_LITERAL(11, 11),  // "FontChanged"
++        QT_MOC_LITERAL(23, 0),   // ""
++        QT_MOC_LITERAL(24, 4),   // "font"
++        QT_MOC_LITERAL(29, 14),  // "PaletteChanged"
++        QT_MOC_LITERAL(44, 7)    // "palette"
++
++    },
++    "qt::QtShim\0FontChanged\0\0font\0"
++    "PaletteChanged\0palette"};
++#undef QT_MOC_LITERAL
++
++static const uint qt_meta_data_qt__QtShim[] = {
++
++    // content:
++    10,     // revision
++    0,      // classname
++    0, 0,   // classinfo
++    2, 14,  // methods
++    0, 0,   // properties
++    0, 0,   // enums/sets
++    0, 0,   // constructors
++    0,      // flags
++    0,      // signalCount
++
++    // slots: name, argc, parameters, tag, flags, initial metatype offsets
++    1, 1, 26, 2, 0x08, 1 /* Private */, 4, 1, 29, 2, 0x08, 3 /* Private */,
++
++    // slots: parameters
++    QMetaType::Void, QMetaType::QFont, 3, QMetaType::Void, QMetaType::QPalette,
++    5,
++
++    0  // eod
++};
++
++void qt::QtShim::qt_static_metacall(QObject* _o,
++                                    QMetaObject::Call _c,
++                                    int _id,
++                                    void** _a) {
++  if (_c == QMetaObject::InvokeMetaMethod) {
++    auto* _t = static_cast<QtShim*>(_o);
++    (void)_t;
++    switch (_id) {
++      case 0:
++        _t->FontChanged((*reinterpret_cast<std::add_pointer_t<QFont>>(_a[1])));
++        break;
++      case 1:
++        _t->PaletteChanged(
++            (*reinterpret_cast<std::add_pointer_t<QPalette>>(_a[1])));
++        break;
++      default:;
++    }
++  }
++}
++
++const QMetaObject qt::QtShim::staticMetaObject = {
++    {QMetaObject::SuperData::link<QObject::staticMetaObject>(),
++     qt_meta_stringdata_qt__QtShim.offsetsAndSize, qt_meta_data_qt__QtShim,
++     qt_static_metacall, nullptr,
++     qt_incomplete_metaTypeArray<
++         qt_meta_stringdata_qt__QtShim_t,
++         QtPrivate::TypeAndForceComplete<QtShim, std::true_type>,
++         QtPrivate::TypeAndForceComplete<void, std::false_type>,
++         QtPrivate::TypeAndForceComplete<const QFont&, std::false_type>,
++         QtPrivate::TypeAndForceComplete<void, std::false_type>,
++         QtPrivate::TypeAndForceComplete<const QPalette&, std::false_type>
++
++         >,
++     nullptr}};
++
++const QMetaObject* qt::QtShim::metaObject() const {
++  return QObject::d_ptr->metaObject ? QObject::d_ptr->dynamicMetaObject()
++                                    : &staticMetaObject;
++}
++
++void* qt::QtShim::qt_metacast(const char* _clname) {
++  if (!_clname) {
++    return nullptr;
++  }
++  if (!strcmp(_clname, qt_meta_stringdata_qt__QtShim.stringdata0)) {
++    return static_cast<void*>(this);
++  }
++  if (!strcmp(_clname, "QtInterface")) {
++    return static_cast<QtInterface*>(this);
++  }
++  return QObject::qt_metacast(_clname);
++}
++
++int qt::QtShim::qt_metacall(QMetaObject::Call _c, int _id, void** _a) {
++  _id = QObject::qt_metacall(_c, _id, _a);
++  if (_id < 0) {
++    return _id;
++  }
++  if (_c == QMetaObject::InvokeMetaMethod) {
++    if (_id < 2) {
++      qt_static_metacall(this, _c, _id, _a);
++    }
++    _id -= 2;
++  } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
++    if (_id < 2) {
++      *reinterpret_cast<QMetaType*>(_a[0]) = QMetaType();
++    }
++    _id -= 2;
++  }
++  return _id;
++}
++QT_WARNING_POP
++QT_END_MOC_NAMESPACE
+diff --git a/ui/qt/qt_ui.cc b/ui/qt/qt_ui.cc
+index d4052b7e8bc3d..6a3b58e9f930b 100644
+--- a/ui/qt/qt_ui.cc
++++ b/ui/qt/qt_ui.cc
+@@ -14,7 +14,9 @@
+ #include "base/check.h"
+ #include "base/command_line.h"
+ #include "base/compiler_specific.h"
++#include "base/environment.h"
+ #include "base/memory/raw_ptr.h"
++#include "base/nix/xdg_util.h"
+ #include "base/notreached.h"
+ #include "base/path_service.h"
+ #include "base/time/time.h"
+@@ -47,6 +49,45 @@ namespace qt {
+ 
+ namespace {
+ 
++const char kQtVersionFlag[] = "qt-version";
++
++void* LoadLibrary(const base::FilePath& path) {
++  return dlopen(path.value().c_str(), RTLD_NOW | RTLD_GLOBAL);
++}
++
++void* LoadLibraryOrFallback(const base::FilePath& path,
++                            const char* preferred,
++                            const char* fallback) {
++  if (void* library = LoadLibrary(path.Append(preferred))) {
++    return library;
++  }
++  return LoadLibrary(path.Append(fallback));
++}
++
++bool PreferQt6() {
++  auto* cmd = base::CommandLine::ForCurrentProcess();
++  if (cmd->HasSwitch(kQtVersionFlag)) {
++    std::string qt_version_string = cmd->GetSwitchValueASCII(kQtVersionFlag);
++    unsigned int qt_version = 0;
++    if (base::StringToUint(qt_version_string, &qt_version)) {
++      switch (qt_version) {
++        case 5:
++          return false;
++        case 6:
++          return true;
++        default:
++          LOG(ERROR) << "Unsupported QT version " << qt_version;
++      }
++    } else {
++      LOG(ERROR) << "Unable to parse QT version " << qt_version_string;
++    }
++  }
++
++  auto env = base::Environment::Create();
++  auto desktop = base::nix::GetDesktopEnvironment(env.get());
++  return desktop == base::nix::DESKTOP_ENVIRONMENT_KDE6;
++}
++
+ int QtWeightToCssWeight(int weight) {
+   struct {
+     int qt_weight;
+@@ -179,8 +220,10 @@ bool QtUi::Initialize() {
+   base::FilePath path;
+   if (!base::PathService::Get(base::DIR_MODULE, &path))
+     return false;
+-  path = path.Append("libqt5_shim.so");
+-  void* libqt_shim = dlopen(path.value().c_str(), RTLD_NOW | RTLD_GLOBAL);
++  void* libqt_shim =
++      PreferQt6()
++          ? LoadLibraryOrFallback(path, "libqt6_shim.so", "libqt5_shim.so")
++          : LoadLibraryOrFallback(path, "libqt5_shim.so", "libqt6_shim.so");
+   if (!libqt_shim)
+     return false;
+   void* create_qt_interface = dlsym(libqt_shim, "CreateQtInterface");
