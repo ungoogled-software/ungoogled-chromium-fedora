@@ -58,11 +58,7 @@
 %endif
 
 # ungoogled-chromium: enable|disable PGO
-%if 0%{?fedora} >= 38
-%global use_pgo 1
-%else
 %global use_pgo 0
-%endif
 
 # set nodejs_version
 %global nodejs_version v19.8.1
@@ -156,7 +152,11 @@
 %global gtk3 1
 
 # Chromium really wants to use its bundled harfbuzz. Sigh.
+%if 0%{?fedora} > 37
+%global bundleharfbuzz 0
+%else
 %global bundleharfbuzz 1
+%endif
 %global bundleopus 0
 %global bundlelibusbx 0
 %global bundlelibwebp 0
@@ -165,12 +165,7 @@
 %global bundlelibdrm 0
 %global bundlefontconfig 0
 %global bundleffmpegfree 0
-# f36 has old libaom
-%if 0%{?fedora} == 36
 %global bundlelibaom 1
-%else
-%global bundlelibaom 0
-%endif
 # system freetype on fedora > 36
 %if 0%{?fedora} > 36
 %global bundlefreetype 0
@@ -191,7 +186,7 @@
 %global debug_pkg 0
 
 Name:	ungoogled-chromium
-Version: 113.0.5672.126
+Version: 114.0.5735.106
 Release: 1%{?dist}
 Summary: A lightweight approach to removing Google web service dependency
 Url: https://github.com/Eloston/ungoogled-chromium
@@ -256,9 +251,6 @@ Patch90: chromium-113-disable-GlobalMediaControlsCastStartStop.patch
 # patch for using system opus
 Patch91: chromium-108-system-opus.patch
 
-# enable WebUIDarkMode
-Patch92: chromium-113-WebUIDarkMode.patch
-
 # system ffmpeg
 Patch114: chromium-107-ffmpeg-duration.patch
 Patch115: chromium-107-proprietary-codecs.patch
@@ -268,20 +260,18 @@ Patch116: chromium-112-ffmpeg-first_dts.patch
 Patch117: chromium-108-ffmpeg-revert-new-channel-layout-api.patch
 
 # gcc13
-Patch122: chromium-113-gcc13.patch
-
-# Patches by Stephan Hartmann, https://github.com/stha09/chromium-patches
-Patch130: chromium-103-VirtualCursor-std-layout.patch
-
-# Pagesize > 4kb
-Patch146: chromium-110-LargerThan4k.patch
+Patch122: chromium-114-gcc13.patch
 
 # Apply these patches to work around EPEL8 issues
 Patch300: chromium-113-rhel8-force-disable-use_gnome_keyring.patch
 # workaround for clang bug, https://github.com/llvm/llvm-project/issues/57826
-Patch302: chromium-113-workaround_clang_bug-structured_binding.patch
-# declare iterators as subtypes
-Patch303: chromium-113-typename.patch
+Patch302: chromium-114-workaround_clang_bug-structured_binding.patch
+# missing typename
+Patch303: chromium-114-typename.patch
+# Qt issue
+Patch320: chromium-114-add_qt6_linuxui_backend.patch
+Patch321: chromium-114-qt-handle_scale_factor_changes.patch
+Patch322: chromium-114-qt-fix_font_double_scaling.patch
 
 # RPM Fusion patches [free/chromium-freeworld]:
 Patch503:       chromium-manpage.patch
@@ -320,7 +310,7 @@ Source13: master_preferences
 Source22:       ungoogled-chromium.appdata.xml
 
 # ungoogled-chromium source
-%global ungoogled_chromium_revision 113.0.5672.126-1
+%global ungoogled_chromium_revision %{version}-1
 Source300:      https://github.com/Eloston/ungoogled-chromium/archive/%{ungoogled_chromium_revision}/ungoogled-chromium-%{ungoogled_chromium_revision}.tar.gz
 
 %if %{clang}
@@ -533,6 +523,8 @@ BuildRequires: ninja-build
 
 # Yes, java is needed as well..
 BuildRequires:	java-1.8.0-openjdk-headless
+
+BuildRequires: libevdev-devel
 
 # There is a hardcoded check for nss 3.26 in the chromium code (crypto/nss_util.cc)
 Requires: nss%{_isa} >= 3.26
@@ -754,8 +746,6 @@ Requires: minizip-compat%{_isa}
 %patch -P91 -p1 -b .system-opus
 %endif
 
-%patch -P92 -p1 -b .WebUIDarkMod
-
 %if ! %{bundleffmpegfree}
 %patch -P114 -p1 -b .system-ffmppeg
 %patch -P115 -p1 -b .prop-codecs
@@ -765,13 +755,9 @@ Requires: minizip-compat%{_isa}
 %endif
 %endif
 
-%patch -P130 -p1 -b .VirtualCursor-std-layout
-
-%patch -P146 -p1 -b .LargerThan4k
-
 %patch -P122 -p1 -b .gcc13
 
-# Always disable gnome keyring
+# ungoogled-chromium: Always disable gnome keyring
 %patch -P300 -p1 -b .disblegnomekeyring
 
 %if %{clang}
@@ -781,6 +767,10 @@ Requires: minizip-compat%{_isa}
 %endif
 
 %patch -P303 -p1 -b .typename
+
+%patch -P320 -p1 -b .add_qt6_linuxui_backend
+%patch -P321 -p1 -b .handle_scale_factor_changes
+%patch -P322 -p1 -b .fix_font_double_scaling
 
 # RPM Fusion patches [free/chromium-freeworld]:
 %patch503 -p1 -b .manpage
@@ -922,6 +912,7 @@ CHROMIUM_CORE_GN_DEFINES+=' build_dawn_tests=false enable_perfetto_unittests=fal
 CHROMIUM_CORE_GN_DEFINES+=' disable_fieldtrial_testing_config=true'
 CHROMIUM_CORE_GN_DEFINES+=' blink_symbol_level=0 symbol_level=0 v8_symbol_level=0'
 CHROMIUM_CORE_GN_DEFINES+=' blink_enable_generated_code_formatting=false'
+CHROMIUM_CORE_GN_DEFINES+=' angle_has_histograms=false'
 export CHROMIUM_CORE_GN_DEFINES
 
 # browser gn defines
@@ -938,6 +929,7 @@ CHROMIUM_BROWSER_GN_DEFINES+=' media_use_openh264=false'
 CHROMIUM_BROWSER_GN_DEFINES+=' rtc_use_h264=false'
 CHROMIUM_BROWSER_GN_DEFINES+=' use_kerberos=true'
 
+# ungoogled-chromium: disable gnome keyring
 CHROMIUM_BROWSER_GN_DEFINES+=' use_gnome_keyring=false'
 
 %if %{use_qt}

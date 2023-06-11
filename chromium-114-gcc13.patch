@@ -98,17 +98,6 @@ diff -up chromium-109.0.5414.74/third_party/blink/public/common/bluetooth/web_bl
  #include <array>
  #include <string>
  
-diff -up chromium-109.0.5414.74/third_party/dawn/src/dawn/native/stream/ByteVectorSink.h.me chromium-109.0.5414.74/third_party/dawn/src/dawn/native/stream/ByteVectorSink.h
---- chromium-109.0.5414.74/third_party/dawn/src/dawn/native/stream/ByteVectorSink.h.me	2023-01-17 18:00:37.123218954 +0100
-+++ chromium-109.0.5414.74/third_party/dawn/src/dawn/native/stream/ByteVectorSink.h	2023-01-17 18:00:50.610300138 +0100
-@@ -15,6 +15,7 @@
- #ifndef SRC_DAWN_NATIVE_STREAM_BYTEVECTORSINK_H_
- #define SRC_DAWN_NATIVE_STREAM_BYTEVECTORSINK_H_
- 
-+#include <cstdint>
- #include <ostream>
- #include <vector>
- 
 diff -up chromium-109.0.5414.74/third_party/dawn/src/tint/reader/spirv/namer.h.me chromium-109.0.5414.74/third_party/dawn/src/tint/reader/spirv/namer.h
 --- chromium-109.0.5414.74/third_party/dawn/src/tint/reader/spirv/namer.h.me	2023-01-17 18:02:44.681538107 +0100
 +++ chromium-109.0.5414.74/third_party/dawn/src/tint/reader/spirv/namer.h	2023-01-17 18:02:57.208679140 +0100
@@ -164,17 +153,6 @@ diff -up chromium-109.0.5414.74/ui/gfx/geometry/linear_gradient.h.me chromium-10
  #include <array>
  #include <string>
  
-diff -up chromium-109.0.5414.74/third_party/perfetto/include/perfetto/ext/base/uuid.h.me chromium-109.0.5414.74/third_party/perfetto/include/perfetto/ext/base/uuid.h
---- chromium-109.0.5414.74/third_party/perfetto/include/perfetto/ext/base/uuid.h.me	2023-01-18 16:00:58.563875881 +0100
-+++ chromium-109.0.5414.74/third_party/perfetto/include/perfetto/ext/base/uuid.h	2023-01-18 16:02:01.773517452 +0100
-@@ -17,6 +17,7 @@
- #ifndef INCLUDE_PERFETTO_EXT_BASE_UUID_H_
- #define INCLUDE_PERFETTO_EXT_BASE_UUID_H_
- 
-+#include <cstdint>
- #include <array>
- #include <string>
- 
 diff -up chromium-109.0.5414.74/third_party/ruy/src/ruy/profiler/instrumentation.h.me chromium-109.0.5414.74/third_party/ruy/src/ruy/profiler/instrumentation.h
 --- chromium-109.0.5414.74/third_party/ruy/src/ruy/profiler/instrumentation.h.me	2023-01-19 10:10:21.287876736 +0100
 +++ chromium-109.0.5414.74/third_party/ruy/src/ruy/profiler/instrumentation.h	2023-01-19 10:11:21.714778896 +0100
@@ -219,17 +197,6 @@ diff -up chromium-109.0.5414.74/components/crash/core/app/crash_reporter_client.
  #include <string>
  
  #include "build/build_config.h"
-diff -up chromium-109.0.5414.74/device/bluetooth/public/cpp/bluetooth_uuid.h.mee chromium-109.0.5414.74/device/bluetooth/public/cpp/bluetooth_uuid.h
---- chromium-109.0.5414.74/device/bluetooth/public/cpp/bluetooth_uuid.h.mee	2023-01-19 10:46:54.826513707 +0100
-+++ chromium-109.0.5414.74/device/bluetooth/public/cpp/bluetooth_uuid.h	2023-01-19 10:47:11.255711472 +0100
-@@ -5,6 +5,7 @@
- #ifndef DEVICE_BLUETOOTH_PUBLIC_CPP_BLUETOOTH_UUID_H_
- #define DEVICE_BLUETOOTH_PUBLIC_CPP_BLUETOOTH_UUID_H_
- 
-+#include <cstdint>
- #include <ostream>
- #include <string>
- #include <vector>
 diff -up chromium-109.0.5414.74/ui/base/prediction/kalman_filter.h.mee chromium-109.0.5414.74/ui/base/prediction/kalman_filter.h
 --- chromium-109.0.5414.74/ui/base/prediction/kalman_filter.h.mee	2023-01-19 11:45:15.953159755 +0100
 +++ chromium-109.0.5414.74/ui/base/prediction/kalman_filter.h	2023-01-19 11:45:22.320246241 +0100
