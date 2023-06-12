@@ -2,9 +2,9 @@ name: OBS Upload
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - '*'
+#   push:
+#     tags:
+#       - '*'
 
 jobs:
   obs-upload:
